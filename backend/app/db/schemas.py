@@ -86,7 +86,7 @@ class ScanResultPublic(ScanResultBase):
     stop_loss: Optional[float] = Field(default=None, exclude=True)
 
     # Factor breakdown
-    factor_results: Optional[dict[str, Any]] = None
+    factor_results_json: Optional[dict[str, Any]] = None
     live_factors_count: int = 0
     stubbed_factors_count: int = 0
 
@@ -107,6 +107,25 @@ class ScanResultPublic(ScanResultBase):
     def is_actionable(self) -> bool:
         """Whether the ticker can be acted upon."""
         return self.status == ScanStatusSchema.CONFIRMED
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def price(self) -> Optional[str]:
+        if self.factor_results_json and "market_data" in self.factor_results_json:
+            val = self.factor_results_json["market_data"].get("price")
+            if val is not None:
+                return f"{val:.2f}"
+        return None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def gap(self) -> Optional[str]:
+        if self.factor_results_json and "market_data" in self.factor_results_json:
+            val = self.factor_results_json["market_data"].get("gap")
+            if val is not None:
+                sign = "+" if val > 0 else ""
+                return f"{sign}{val:.2f}%"
+        return None
 
 
 class ScanTriggerRequest(BaseModel):
@@ -262,3 +281,125 @@ class EODScorecardResponse(BaseModel):
     risk_distribution: dict[str, int]  # bucket → count
     veto_summary: list[dict[str, str]]  # [{ticker, rule, reason}]
     factor_coverage: dict[str, int]  # {"live": N, "stubbed": M}
+
+
+# ---------------------------------------------------------------------------
+# StockGlass AI — API Contract (v1) Schemas
+# ---------------------------------------------------------------------------
+class IndexItemSchema(BaseModel):
+    name: str
+    value: str
+    chg: float
+    pct: float
+
+
+class SupportResistanceLevels(BaseModel):
+    support: float
+    resistance: float
+
+
+class StockListItemSchema(BaseModel):
+    symbol: str
+    name: str
+    sector: str
+    price: float
+    chg: float
+    pct: float
+    volume: str
+    score: float
+    earningsSoon: bool
+    hardFlags: list[str]
+    sparkline: list[float]
+    levels: SupportResistanceLevels
+
+
+class StockListResponseSchema(BaseModel):
+    count: int
+    total: int
+    results: list[StockListItemSchema]
+
+
+class LayerScoreItem(BaseModel):
+    layer: str
+    value: float
+
+
+class ReasonItem(BaseModel):
+    type: str  # "bull" or "bear"
+    code: str  # e.g. "F44"
+    text: str
+
+
+class NewsItemSchema(BaseModel):
+    headline: str
+    source: str
+    publishedAt: str
+    url: str
+
+
+class StockDetailSchema(BaseModel):
+    symbol: str
+    name: str
+    sector: str
+    price: float
+    chg: float
+    pct: float
+    score: float
+    hardFlags: list[str]
+    levels: SupportResistanceLevels
+    layerScores: list[LayerScoreItem]
+    reasons: list[ReasonItem]
+    news: list[NewsItemSchema]
+
+
+class FactorBreakdownItem(BaseModel):
+    code: str
+    status: str  # "pass", "neutral", "fail"
+    detail: str
+
+
+class LayerBreakdownItem(BaseModel):
+    layer: str
+    range: str  # e.g. "F1-F5"
+    factors: list[FactorBreakdownItem]
+
+
+class FactorSummarySchema(BaseModel):
+    pass_: int = Field(alias="pass", default=0)
+    neutral: int = 0
+    fail: int = 0
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class FullFactorBreakdownSchema(BaseModel):
+    symbol: str
+    summary: FactorSummarySchema
+    layers: list[LayerBreakdownItem]
+
+
+# Paper Trading Position Schemas
+class PositionCreateSchema(BaseModel):
+    symbol: str
+    qty: float
+    entryPrice: float
+
+
+class PositionItemSchema(BaseModel):
+    id: str
+    symbol: str
+    qty: float
+    entryPrice: float
+    currentPrice: Optional[float] = None
+    unrealizedPnl: Optional[float] = None
+    realizedPnl: Optional[float] = None
+    exitPrice: Optional[float] = None
+    status: str
+    openedAt: Optional[str] = None
+    closedAt: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PositionListResponseSchema(BaseModel):
+    results: list[PositionItemSchema]

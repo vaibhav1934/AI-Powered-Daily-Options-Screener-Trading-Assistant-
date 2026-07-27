@@ -1,7 +1,7 @@
 [project]
 name = "options-screener-backend"
 version = "1.0.0"
-description = "AI-Powered Daily Options Screener & Trading Assistant — Backend"
+description = "StockGlass AI — Institutional Options & Stock Screener Backend"
 requires-python = ">=3.11"
 dependencies = [
     # Web framework
@@ -17,14 +17,11 @@ dependencies = [
     # Validation & serialization
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",
-
+    
     # AI — Anthropic SDK (native, no LangChain)
     "anthropic>=0.30.0",
 
-    # Google ADC for Vertex AI path
-    "google-auth>=2.30.0",
-
-    # HTTP client for market data APIs
+    # HTTP client for market data APIs and direct LLM REST calls
     "httpx>=0.27.0",
 
     # Scheduling

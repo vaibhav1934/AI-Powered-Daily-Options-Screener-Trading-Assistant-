@@ -23,7 +23,7 @@ from app.framework.factors.f47_pre_earnings_exit import F47PreEarningsBinaryExit
 from app.framework.factors.f48_gap_hold_protocol import F48GapHoldProtocol
 from app.framework.factors.f49_boj_kospi_rule import F49BOJKOSPIRule
 from app.framework.factors.f50_war_tape_rule import F50WarTapeRule
-from app.framework.factors.stubs.stub_factory import create_all_stubs
+from app.framework.factors.f1_to_f39_generic import build_f1_to_f39
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +43,9 @@ class FactorRegistry:
 
     def _register_all(self) -> None:
         """Register all 50 factors."""
-        # F1–F39: Stubs (unconfigured)
-        for stub in create_all_stubs():
-            self._factors[stub.factor_id] = stub
+        # F1–F39: Generic implementations
+        for factor in build_f1_to_f39():
+            self._factors[factor.factor_id] = factor
 
         # F40–F50: Live implementations
         live_factors: list[BaseFactor] = [

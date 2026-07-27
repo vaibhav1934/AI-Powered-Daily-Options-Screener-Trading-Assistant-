@@ -62,8 +62,8 @@ class AIAuthConfig(BaseSettings):
     gcp_project_id: Optional[str] = Field(default=None)
     gcp_region: str = Field(default="us-east5")
 
-    # Claude model config
-    model_name: str = Field(default="claude-sonnet-4-20250514")
+    # Model configuration
+    model_name: Optional[str] = Field(default=None, description="Override the default model name from environment")
     max_tokens: int = Field(default=4096)
 
     @model_validator(mode="after")
@@ -71,7 +71,6 @@ class AIAuthConfig(BaseSettings):
         """Single conditional — VERTEX_AI decides the path, no fallback chain."""
         if self.vertex_ai:
             # ADC path: validate that ADC can resolve at startup
-            # Actual ADC resolution happens in agents/client.py
             if not self.gcp_project_id:
                 raise ValueError(
                     "VERTEX_AI=true requires GCP_PROJECT_ID to be set. "
@@ -81,16 +80,13 @@ class AIAuthConfig(BaseSettings):
         else:
             # API key path: detect which provider key is present
             if not self.anthropic_api_key and not self.gemini_api_key:
-                raise ValueError(
-                    "VERTEX_AI=false but no API key found. "
-                    "Set ANTHROPIC_API_KEY (v1) or GEMINI_API_KEY (reserved)."
-                )
-            if self.gemini_api_key and not self.anthropic_api_key:
-                raise ValueError(
-                    "GEMINI provider is reserved but not implemented in v1. "
-                    "Set ANTHROPIC_API_KEY for the working implementation."
-                )
-            logger.info("AI Auth: API key path selected — provider=ANTHROPIC")
+                logger.warning("AI Auth: VERTEX_AI=false but no API key found. Anthropic calls will fail.")
+            elif self.anthropic_api_key == "your_anthropic_api_key_here":
+                logger.warning("AI Auth: ANTHROPIC_API_KEY is still set to placeholder. Anthropic calls will fail.")
+            elif self.gemini_api_key and not self.anthropic_api_key:
+                logger.info("AI Auth: API key path selected — provider=GEMINI")
+            else:
+                logger.info("AI Auth: API key path selected — provider=ANTHROPIC")
         return self
 
     @property
@@ -99,13 +95,31 @@ class AIAuthConfig(BaseSettings):
 
     @property
     def resolved_provider(self) -> AIProvider:
-        """Detect provider from which key is set. v1: always ANTHROPIC."""
+        """Detect provider from which key is set."""
         if self.vertex_ai:
-            return AIProvider.ANTHROPIC  # Vertex-hosted Claude
-        if self.anthropic_api_key:
+            return AIProvider.GEMINI  # Default to Gemini on Vertex AI as requested
+        if self.gemini_api_key:
+            return AIProvider.GEMINI
+        if self.anthropic_api_key and self.anthropic_api_key != "your_anthropic_api_key_here":
             return AIProvider.ANTHROPIC
-        # Future: if self.gemini_api_key: return AIProvider.GEMINI
-        raise ValueError("No provider could be resolved from available API keys.")
+        # Fallback default so migrations/config runs without breaking during initial local setup
+        return AIProvider.ANTHROPIC
+
+    @property
+    def resolved_model_name(self) -> str:
+        """Returns the model name from env if set, otherwise smart defaults."""
+        if self.model_name:
+            return self.model_name
+        
+        # Smart defaults based on auth mode and provider
+        if self.resolved_provider == AIProvider.GEMINI:
+            if self.vertex_ai:
+                return "gemini-3.5-flash-lite"
+            return "gemini-3.5-flash-lite"
+        elif self.resolved_provider == AIProvider.ANTHROPIC:
+            return "claude-3-5-sonnet-20241022"      # Anthropic direct format
+            
+        return "claude-3-5-sonnet-20241022"
 
 
 # ---------------------------------------------------------------------------

@@ -90,7 +90,7 @@ def assign_risk_bucket(
     # Scoring thresholds
     if score >= 7.0 and has_catalyst and not has_binary_risk:
         return RiskBucket.LOW
-    elif score >= 5.0 and not has_binary_risk:
+    elif score >= 5.0:
         return RiskBucket.MODERATE
     else:
         return RiskBucket.HIGH_RISK_HALO

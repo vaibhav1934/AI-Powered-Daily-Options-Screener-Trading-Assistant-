@@ -164,3 +164,36 @@ class FactorNotConfiguredError(AppError):
             message=f"Factor {factor_id} is not yet configured. Supply trigger conditions to activate.",
             detail={"factor_id": factor_id, "status": "unconfigured"},
         )
+
+
+# --- StockGlass API Errors ---
+
+
+class StockGlassAuthError(AppError):
+    status_code = 401
+    error_code = "AUTHENTICATION_ERROR"
+
+    def __init__(self, message: str = "Token expired or invalid scope.", detail: Optional[dict[str, Any]] = None) -> None:
+        self.status_code = 401
+        self.error_code = "AUTHENTICATION_ERROR"
+        super().__init__(message=message, detail=detail)
+
+
+class PositionNotFoundError(AppError):
+    status_code = 404
+    error_code = "NOT_FOUND"
+
+    def __init__(self, position_id: str) -> None:
+        self.status_code = 404
+        self.error_code = "NOT_FOUND"
+        super().__init__(message=f"Position {position_id} not found.", detail={"position_id": position_id})
+
+
+class StockNotFoundError(AppError):
+    status_code = 404
+    error_code = "NOT_FOUND"
+
+    def __init__(self, symbol: str) -> None:
+        self.status_code = 404
+        self.error_code = "NOT_FOUND"
+        super().__init__(message=f"Stock {symbol} not found.", detail={"symbol": symbol})

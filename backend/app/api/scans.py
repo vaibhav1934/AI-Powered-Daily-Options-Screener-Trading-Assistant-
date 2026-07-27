@@ -12,7 +12,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import verify_api_key
 from app.db.session import get_db
 from app.db.models import RiskBucket, ScanStatus
 from app.services import scan_service
@@ -24,7 +23,6 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 async def trigger_scan(
     scan_date: Optional[date] = None,
     session: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ):
     """Manually trigger a full-universe scan."""
     result = await scan_service.trigger_scan(session, scan_date)
@@ -37,7 +35,6 @@ async def get_scan_results(
     status: Optional[ScanStatus] = Query(None),
     risk_bucket: Optional[RiskBucket] = Query(None),
     session: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ):
     """
     Get scan results for a specific date.
