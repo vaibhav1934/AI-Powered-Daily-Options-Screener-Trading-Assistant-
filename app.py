@@ -21,8 +21,8 @@ with gr.Blocks(title="StockGlass AI Trading Assistant Backend") as demo:
         gr.Markdown("*Note: Your Vercel frontend seamlessly communicates with this server via the `/v1` REST API and SSE endpoints.*")
 
 # Mount Gradio onto the root of our FastAPI app
-fastapi_app = gr.mount_gradio_app(fastapi_app, demo, path="/")
+app = gr.mount_gradio_app(fastapi_app, demo, path="/")
 
-if __name__ == "__main__":
+if __name__ == "__main__" and not os.environ.get("SPACE_ID") and not os.environ.get("SYSTEM") == "spaces":
     port = int(os.environ.get("PORT", 7860))
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)

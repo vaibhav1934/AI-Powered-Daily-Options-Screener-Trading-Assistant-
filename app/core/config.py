@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import enum
 import logging
+import os
 from functools import lru_cache
 from typing import Optional
 
@@ -168,7 +169,7 @@ class DatabaseConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = Field(
-        default="postgresql+asyncpg://postgres:password@localhost:5432/options_screener"
+        default=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./stockglass.db")
     )
 
     # Connection pool
