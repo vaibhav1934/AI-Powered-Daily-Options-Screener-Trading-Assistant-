@@ -9,6 +9,7 @@ PostgreSQL schema — 7 tables:
   5. market_data_cache — Postgres-backed cache for market data API responses
   6. positions       — Paper trading positions with server-side P&L
   7. stocks          — Universe table of ~6,000 tickers with SEC CIK, exchange, and sector
+  8. users           — Authentication & access control accounts for JWT access
 
 All times are server-authoritative, stored in UTC, evaluated in America/Chicago.
 """
@@ -344,6 +345,30 @@ class StockUniverse(Base):
     sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     exchange: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     cik: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+# ---------------------------------------------------------------------------
+# 8. users (Authentication & Access Control Table)
+# ---------------------------------------------------------------------------
+class User(Base):
+    """
+    User table storing administrator and trader accounts for JWT authentication.
+    No public registration API; created exclusively via CLI scripts.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     created_at: Mapped[datetime] = mapped_column(

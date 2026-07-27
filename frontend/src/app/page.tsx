@@ -9,6 +9,7 @@ import { ScreenerTable } from "@/components/screener/ScreenerTable";
 import { DetailPanel } from "@/components/screener/DetailPanel";
 import { FactorModal } from "@/components/screener/FactorModal";
 import { AIChatPanel } from "@/components/chat/AIChatPanel";
+import AuthOverlay from "@/components/auth/AuthOverlay";
 
 export default function StockGlassProDashboard() {
   // --- Data State ---
@@ -281,31 +282,38 @@ export default function StockGlassProDashboard() {
           />
         )}
 
-        {rightPanelMode === "detail" ? (
-          <DetailPanel
-            symbol={selectedSymbol}
-            detail={selectedDetail}
-            loading={loadingDetail}
-            onOpenFactors={() => setShowFactors(true)}
-            onAskAi={handleAskAi}
-          />
-        ) : (
-          <AIChatPanel
-            symbol={selectedSymbol}
-            item={activeItem}
-            messages={chatMessages}
-            onAddMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
-            onUpdateLastAssistantMessage={(content) => {
-              setChatMessages((prev) => {
-                const next = [...prev];
-                if (next.length > 0 && next[next.length - 1].role === "assistant") {
-                  next[next.length - 1].content = content;
-                }
-                return next;
-              });
-            }}
-          />
-        )}
+        <div style={{ width: 440, flexShrink: 0, height: "100%", overflow: "hidden" }}>
+          <AuthOverlay
+            featureName={rightPanelMode === "detail" ? "Setup Detail & Factor Breakdown" : "AI Trading Assistant & Chat"}
+            description="Log in with your administrator or trader credentials to unlock deep-dive screener analytics, options chain execution, and interactive AI chat."
+          >
+            {rightPanelMode === "detail" ? (
+              <DetailPanel
+                symbol={selectedSymbol}
+                detail={selectedDetail}
+                loading={loadingDetail}
+                onOpenFactors={() => setShowFactors(true)}
+                onAskAi={handleAskAi}
+              />
+            ) : (
+              <AIChatPanel
+                symbol={selectedSymbol}
+                item={activeItem}
+                messages={chatMessages}
+                onAddMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
+                onUpdateLastAssistantMessage={(content) => {
+                  setChatMessages((prev) => {
+                    const next = [...prev];
+                    if (next.length > 0 && next[next.length - 1].role === "assistant") {
+                      next[next.length - 1].content = content;
+                    }
+                    return next;
+                  });
+                }}
+              />
+            )}
+          </AuthOverlay>
+        </div>
       </div>
 
       {/* Full 50-Factor Log Modal */}
