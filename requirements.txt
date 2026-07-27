@@ -15,4 +15,5 @@ apscheduler>=3.10.0
 pytz>=2024.1
 structlog>=24.1.0
 supabase>=2.5.0
-gradio>=4.0.0
+gradio>=5.0.0
+huggingface-hub<0.25.0
