@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.router import api_router
+from app.api.router import api_router, root_api_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.rate_limiter import init_rate_limiters
@@ -200,8 +200,9 @@ def create_app() -> FastAPI:
             },
         )
 
-    # Register routes
+    # Register routes (both under /v1 and at root fallback)
     app.include_router(api_router)
+    app.include_router(root_api_router)
 
     # Root endpoint for container health checks and status
     @app.get("/")
