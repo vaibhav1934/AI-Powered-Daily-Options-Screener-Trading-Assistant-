@@ -47,6 +47,12 @@ export default function StockGlassProDashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalStocksCount, setTotalStocksCount] = useState(0);
 
+  const pageCacheRef = useRef<Record<string, { items: StockListItem[]; totalPages: number; totalCount: number }>>({});
+  const getCacheKey = useCallback(
+    (page: number) => JSON.stringify({ activeFilter, activeSector, riskBucket, minScore, activeQuick, query, page }),
+    [activeFilter, activeSector, riskBucket, minScore, activeQuick, query]
+  );
+
   useEffect(() => {
     setCurrentPage(1);
   }, [activeFilter, activeSector, riskBucket, minScore, activeQuick, query]);
@@ -77,6 +83,15 @@ export default function StockGlassProDashboard() {
 
   // 2. Fetch Stock List from Backend (Reactive to filters and page)
   const loadStocks = useCallback(async () => {
+    const cacheKey = getCacheKey(currentPage);
+    if (pageCacheRef.current[cacheKey]) {
+      setStocks(pageCacheRef.current[cacheKey].items);
+      setTotalPages(pageCacheRef.current[cacheKey].totalPages);
+      setTotalStocksCount(pageCacheRef.current[cacheKey].totalCount);
+      setLoadingStocks(false);
+      return;
+    }
+
     setLoadingStocks(true);
     setError(null);
     try {
@@ -93,19 +108,40 @@ export default function StockGlassProDashboard() {
 
       const res = await fetchStocks(params);
       const items = res.results || [];
+      const tp = res.total_pages || 1;
+      const tc = res.total || items.length;
+
+      pageCacheRef.current[cacheKey] = { items, totalPages: tp, totalCount: tc };
       setStocks(items);
-      setTotalPages(res.total_pages || 1);
-      setTotalStocksCount(res.total || items.length);
+      setTotalPages(tp);
+      setTotalStocksCount(tc);
 
       if (!selectedSymbolRef.current && items.length > 0) {
         setSelectedSymbol(items[0].symbol);
+      }
+
+      // Silent background prefetch for next page to ensure 0ms transition
+      if (currentPage < tp) {
+        const nextKey = getCacheKey(currentPage + 1);
+        if (!pageCacheRef.current[nextKey]) {
+          const nextParams = { ...params, page: currentPage + 1 };
+          fetchStocks(nextParams)
+            .then((nextRes) => {
+              pageCacheRef.current[nextKey] = {
+                items: nextRes.results || [],
+                totalPages: nextRes.total_pages || tp,
+                totalCount: nextRes.total || tc,
+              };
+            })
+            .catch(() => {});
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to load screener stocks from API");
     } finally {
       setLoadingStocks(false);
     }
-  }, [activeFilter, activeSector, riskBucket, minScore, activeQuick, query, currentPage]);
+  }, [activeFilter, activeSector, riskBucket, minScore, activeQuick, query, currentPage, getCacheKey]);
 
   useEffect(() => {
     loadStocks();
@@ -282,7 +318,7 @@ export default function StockGlassProDashboard() {
           />
         )}
 
-        <div style={{ width: 440, flexShrink: 0, height: "100%", overflow: "hidden" }}>
+        <div style={{ width: rightPanelMode === "detail" ? 380 : 440, flexShrink: 0, height: "100%", overflow: "hidden", display: "flex", flexDirection: "column", transition: "width 0.2s ease" }}>
           <AuthOverlay
             featureName={rightPanelMode === "detail" ? "Setup Detail & Factor Breakdown" : "AI Trading Assistant & Chat"}
             description="Log in with your administrator or trader credentials to unlock deep-dive screener analytics, options chain execution, and interactive AI chat."

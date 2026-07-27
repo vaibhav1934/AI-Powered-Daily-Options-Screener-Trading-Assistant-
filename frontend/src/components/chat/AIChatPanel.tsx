@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChatMessage, StockListItem } from "@/types/stockglass";
 import { streamChat } from "@/lib/sse";
-import { Activity, MessageSquare, Sparkles, Send } from "lucide-react";
+import { Activity, MessageSquare, Sparkles, Send, Square } from "lucide-react";
 
 interface AIChatPanelProps {
   symbol: string;
@@ -100,6 +100,14 @@ export function AIChatPanel({
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationId = useRef("");
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!conversationId.current) {
@@ -126,13 +134,17 @@ export function AIChatPanel({
     const placeholderAssistant: ChatMessage = { role: "assistant", content: "" };
     onAddMessage(placeholderAssistant);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     let accumulated = "";
     try {
       const stream = streamChat(
         `[Context: Selected Ticker ${symbol || "Market"}, Price: $${item?.price || "N/A"}, Score: ${item?.convictionScore || "N/A"}]
 
 User Query: ${textToSend}`,
-        conversationId.current || "default-conv"
+        conversationId.current || "default-conv",
+        controller.signal
       );
 
       for await (const chunk of stream) {
@@ -145,7 +157,11 @@ User Query: ${textToSend}`,
         }
       }
     } catch (err: any) {
-      if (!accumulated) {
+      if (err.name === "AbortError" || err.message?.includes("aborted") || err.message?.includes("The user aborted a request")) {
+        onUpdateLastAssistantMessage(
+          accumulated + "\n\n*[⏹️ Generation stopped by user]*"
+        );
+      } else if (!accumulated) {
         onUpdateLastAssistantMessage(
           `❌ **Live AI Engine Error:** Unable to reach backend chat server (${err.message || "Connection failed"}). Ensure uvicorn is running on port 8001.`
         );
@@ -154,11 +170,12 @@ User Query: ${textToSend}`,
       }
     } finally {
       setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   };
 
   return (
-    <div style={{ borderLeft: "1px solid #e8eaed", width: 360, flexShrink: 0, background: "#fff", display: "flex", flexDirection: "column", height: "100%", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", color: "#202124" }}>
+    <div style={{ borderLeft: "1px solid #e8eaed", width: "100%", flexShrink: 0, background: "#fff", display: "flex", flexDirection: "column", height: "100%", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", color: "#202124" }}>
       {/* Header */}
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -252,22 +269,48 @@ User Query: ${textToSend}`,
               color: "#202124",
             }}
           />
-          <button
-            type="submit"
-            disabled={!input.trim() || isStreaming}
-            style={{
-              position: "absolute",
-              right: 8,
-              background: "none",
-              border: "none",
-              color: "#1a73e8",
-              cursor: "pointer",
-              padding: 4,
-              opacity: !input.trim() || isStreaming ? 0.4 : 1,
-            }}
-          >
-            <Send size={16} />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              title="Stop generation"
+              style={{
+                position: "absolute",
+                right: 8,
+                background: "#fce8e6",
+                border: "1px solid #fad2cf",
+                borderRadius: "50%",
+                color: "#c5221f",
+                cursor: "pointer",
+                padding: 4,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 26,
+                height: 26,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+              }}
+            >
+              <Square size={12} fill="#c5221f" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              style={{
+                position: "absolute",
+                right: 8,
+                background: "none",
+                border: "none",
+                color: "#1a73e8",
+                cursor: "pointer",
+                padding: 4,
+                opacity: !input.trim() ? 0.4 : 1,
+              }}
+            >
+              <Send size={16} />
+            </button>
+          )}
         </form>
 
         <div style={{ marginTop: 10, display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>

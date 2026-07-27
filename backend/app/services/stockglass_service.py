@@ -134,7 +134,6 @@ async def get_stock_list(
     
     stmt = (
         select(DailyScan)
-        .options(selectinload(DailyScan.factor_logs))
         .where(DailyScan.scan_date >= start_dt)
         .order_by(DailyScan.score.desc())
     )
@@ -200,9 +199,10 @@ async def get_stock_list(
         hard_flags = []
         if scan.veto_rule:
             hard_flags.append(scan.veto_rule)
-        for flog in scan.factor_logs:
-            if flog.vetoed and flog.factor_id not in hard_flags:
-                hard_flags.append(flog.factor_id)
+        if scan.factor_results_json and isinstance(scan.factor_results_json, dict):
+            for f_res in scan.factor_results_json.get("results", []):
+                if f_res.get("vetoed") and f_res.get("factor_id") and f_res.get("factor_id") not in hard_flags:
+                    hard_flags.append(f_res.get("factor_id"))
                 
         sparkline = [round(price - chg * 1.5, 2), round(price - chg * 0.5, 2), round(price, 2)] if price > 0 else [0.0, 0.0, 0.0]
         levels = SupportResistanceLevels(

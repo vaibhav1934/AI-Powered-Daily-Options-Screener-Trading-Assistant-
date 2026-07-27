@@ -97,15 +97,14 @@ async def process_chat_message(
         if r.factor_results_json and isinstance(r.factor_results_json, dict):
             market_data = r.factor_results_json.get("market_data", {})
             for f in r.factor_results_json.get("results", []):
-                if f.get("triggered") or f.get("vetoed") or f.get("status") == "live":
+                if f.get("triggered") or f.get("vetoed"):
                     factor_evaluations.append({
                         "id": f.get("factor_id"),
                         "name": f.get("factor_name"),
                         "layer": f.get("layer_number"),
-                        "status": f.get("status"),
                         "triggered": f.get("triggered"),
                         "vetoed": f.get("vetoed"),
-                        "detail": f.get("detail"),
+                        "detail": str(f.get("detail", ""))[:120],
                     })
 
         scan_summary.append({
@@ -138,7 +137,7 @@ async def process_chat_message(
     try:
         # 1st LLM call (to get answer or tool calls)
         stream = client.stream_chat(
-            messages=CONVERSATIONS[conversation_id], # type: ignore
+            messages=CONVERSATIONS[conversation_id][-10:], # type: ignore
             system_prompt=sys_prompt,
             tools=tools
         )
@@ -182,4 +181,11 @@ async def process_chat_message(
         
     except Exception as e:
         logger.error("Error in chat agent: %s", str(e), exc_info=True)
-        yield {"type": "error", "content": f"An error occurred: {str(e)}"}
+        err_msg = str(e)
+        if "429" in err_msg or "Too Many Requests" in err_msg or "quota" in err_msg.lower():
+            friendly_content = "\n\n⚠️ **AI Provider Rate Limit / Quota Exceeded (429)**: The AI API key has temporarily reached its per-minute request or token limit. Please wait **30–60 seconds** for the quota bucket to reset, then send your message again."
+        elif "timeout" in err_msg.lower() or "readtimeout" in err_msg.lower():
+            friendly_content = "\n\n⚠️ **AI Connection Timeout**: The AI provider took too long to respond or the streaming connection dropped. Please try your question again."
+        else:
+            friendly_content = f"\n\n⚠️ **AI Assistant Error**: {err_msg}"
+        yield {"type": "error", "content": friendly_content}

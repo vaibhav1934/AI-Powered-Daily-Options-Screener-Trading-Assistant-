@@ -45,7 +45,7 @@ class LLMClient:
                 "generationConfig": {"temperature": 0.3, "maxOutputTokens": 512},
             }
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={api_key}"
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=300.0, connect=15.0)) as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -96,7 +96,7 @@ class LLMClient:
             # Using alt=sse so we get Server-Sent Events
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:streamGenerateContent?alt=sse&key={api_key}"
             
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=None, connect=15.0, write=30.0)) as client:
                 async with client.stream("POST", url, json=payload) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():

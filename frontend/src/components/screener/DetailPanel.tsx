@@ -61,7 +61,7 @@ export function DetailPanel({
 
   if (!symbol) {
     return (
-      <div style={{ borderLeft: "1px solid #e8eaed", padding: 40, width: 340, flexShrink: 0, background: "#fff", textAlign: "center", color: "#5f6368" }}>
+      <div style={{ borderLeft: "1px solid #e8eaed", padding: 40, width: "100%", flexShrink: 0, background: "#fff", textAlign: "center", color: "#5f6368" }}>
         <p style={{ fontSize: 16, fontWeight: 500, color: "#202124" }}>Select a Setup</p>
         <p style={{ fontSize: 13, marginTop: 4 }}>Click any row on the left to see why it scored the way it did.</p>
       </div>
@@ -70,7 +70,7 @@ export function DetailPanel({
 
   if (loading || !detail) {
     return (
-      <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: 340, flexShrink: 0, background: "#fff" }}>
+      <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <div className="h-6 w-24 bg-slate-100 rounded animate-pulse" />
           <div className="h-6 w-12 bg-slate-100 rounded animate-pulse" />
@@ -95,7 +95,7 @@ export function DetailPanel({
     : [];
 
   return (
-    <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: 340, flexShrink: 0, background: "#fff", overflowY: "auto", height: "100%" }}>
+    <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff", overflowY: "auto", height: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 500, color: "#202124" }}>{detail.symbol}</div>

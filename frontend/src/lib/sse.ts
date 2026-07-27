@@ -8,7 +8,7 @@ export interface ChatMessage {
 
 export type StreamChunk = { type: 'chunk', content: string } | { type: 'tool_call', name: string, args: any };
 
-export async function* streamChat(message: string, conversationId: string): AsyncGenerator<StreamChunk, void, unknown> {
+export async function* streamChat(message: string, conversationId: string, signal?: AbortSignal): AsyncGenerator<StreamChunk, void, unknown> {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
     headers: {
@@ -16,6 +16,7 @@ export async function* streamChat(message: string, conversationId: string): Asyn
       "X-API-Key": "dev_key",
     },
     body: JSON.stringify({ message, conversation_id: conversationId }),
+    signal,
   });
 
   if (!response.ok) {
