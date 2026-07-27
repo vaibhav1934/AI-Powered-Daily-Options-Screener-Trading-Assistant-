@@ -410,3 +410,28 @@ class PositionItemSchema(BaseModel):
 
 class PositionListResponseSchema(BaseModel):
     results: list[PositionItemSchema]
+
+
+# ---------------------------------------------------------------------------
+# Authentication Schemas (JWT Access & Refresh Tokens)
+# ---------------------------------------------------------------------------
+class LoginRequestSchema(BaseModel):
+    username: str
+    password: str
+
+
+class RefreshTokenRequestSchema(BaseModel):
+    refresh_token: str
+
+
+class TokenResponseSchema(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int = 3600
+
+
+class UserProfileSchema(BaseModel):
+    username: str
+    is_active: bool
+    created_at: Optional[str] = None

@@ -20,6 +20,8 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.rate_limiter import init_rate_limiters
+from app.db.session import engine
+from app.db.models import Base
 
 # Configure structured logging
 structlog.configure(
@@ -52,6 +54,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize rate limiters
     init_rate_limiters()
+
+    # Ensure database tables exist (e.g. users table for JWT auth)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database schema initialized successfully")
+    except Exception as e:
+        logger.error("Failed to initialize database schema: %s", str(e))
 
     logger.info("Application ready")
 

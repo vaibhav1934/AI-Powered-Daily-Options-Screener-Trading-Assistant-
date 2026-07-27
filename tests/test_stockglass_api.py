@@ -104,7 +104,13 @@ async def override_get_db():
 from app.core.rate_limiter import init_rate_limiters
 init_rate_limiters()
 
-app.dependency_overrides[get_db] = override_get_db
+@pytest.fixture(autouse=True)
+def setup_stockglass_db_override():
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    if get_db in app.dependency_overrides:
+        del app.dependency_overrides[get_db]
+
 client = TestClient(app)
 
 VALID_HEADERS = {"Authorization": "Bearer test_token_123"}
