@@ -172,6 +172,12 @@ class DatabaseConfig(BaseSettings):
         default=os.getenv("DATABASE_URL", "").strip() or "sqlite+aiosqlite:///./stockglass.db"
     )
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def sanitize_db_url(cls, v: str) -> str:
+        """Strip whitespace and accidental trailing newlines from database URL secret."""
+        return v.strip() if isinstance(v, str) and v.strip() else "sqlite+aiosqlite:///./stockglass.db"
+
     # Connection pool
     pool_size: int = Field(default=10)
     pool_max_overflow: int = Field(default=20)
