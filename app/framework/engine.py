@@ -66,9 +66,13 @@ def run_scan_for_ticker(ctx: ScanContext) -> ScanContext:
             layer.name,
             ctx.ticker,
         )
+        # Calculate score BEFORE Layer 9 (Conviction Scoring) so F40 can use it
+        if layer.layer_number == 9:
+            ctx.conviction_score = calculate_conviction_score(ctx)
+            
         ctx = layer.process(ctx)
 
-    # Calculate conviction score after all layers
+    # Recalculate conviction score after all layers to include any final downgrades
     ctx.conviction_score = calculate_conviction_score(ctx)
 
     # Assign risk bucket
@@ -198,6 +202,9 @@ def _build_scan_context(
         # Sector
         sector=ticker_data.get("sector", ""),
         industry=ticker_data.get("industry", ""),
+        name=ticker_data.get("name", ""),
+        change=ticker_data.get("change", 0.0),
+        volume_str=ticker_data.get("volume_str", ""),
         # Analyst
         analyst_rating_change=ticker_data.get("analyst_rating_change", False),
         analyst_firm_tier=ticker_data.get("analyst_firm_tier"),

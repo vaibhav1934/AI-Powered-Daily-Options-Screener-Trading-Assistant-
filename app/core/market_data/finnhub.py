@@ -160,12 +160,15 @@ class FinnhubClient:
     ) -> list[NewsItem]:
         """Get news, optionally filtered by ticker or category."""
         if ticker:
+            from datetime import timedelta
+            news_from = (date.today() - timedelta(days=7)).isoformat()
+            news_to = date.today().isoformat()
             data = await self._request(
                 "/company-news",
                 {
                     "symbol": ticker,
-                    "from": date.today().isoformat(),
-                    "to": date.today().isoformat(),
+                    "from": news_from,
+                    "to": news_to,
                 },
                 session,
             )
@@ -205,6 +208,32 @@ class FinnhubClient:
             indicator,
         )
         return []
+
+    async def get_company_profile(
+        self,
+        ticker: str,
+        session: Any = None,
+    ) -> dict[str, str]:
+        """
+        Get company profile data: name, sector, industry, country.
+        Returns a dict with 'name' and 'sector' keys (empty strings if unavailable).
+        """
+        try:
+            data = await self._request(
+                "/stock/profile2",
+                {"symbol": ticker},
+                session,
+            )
+            return {
+                "name": data.get("name", ""),
+                "sector": data.get("finnhubIndustry", ""),
+                "country": data.get("country", ""),
+                "market_cap": data.get("marketCapitalization", 0.0),
+                "website": data.get("weburl", ""),
+            }
+        except Exception as e:
+            logger.warning("Failed to get company profile for %s: %s", ticker, e)
+            return {"name": "", "sector": "", "country": "", "market_cap": 0.0, "website": ""}
 
     async def close(self) -> None:
         """Close the HTTP client."""

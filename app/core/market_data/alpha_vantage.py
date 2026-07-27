@@ -86,16 +86,11 @@ class AlphaVantageClient:
                     )
                 return cached
 
-        # Acquire rate limit token (25/day — may block for a LONG time or fail)
-        limiter = rate_limiter_registry.get(self.provider_name)
-        remaining = limiter.remaining_calls
-        logger.info(
-            "Alpha Vantage API call: %s (remaining today: %d/25)",
-            endpoint,
-            remaining,
-        )
-
-        await rate_limiter_registry.acquire(self.provider_name, block=False)
+        # Acquire rate limit token without blocking for AlphaVantage (it's daily)
+        from app.core.exceptions import RateLimitExceededError
+        acquired = await rate_limiter_registry.acquire(self.provider_name, block=False)
+        if not acquired:
+            raise RateLimitExceededError(provider=self.provider_name, limit=25)
 
         # Make request
         full_params = {**params, "apikey": self._api_key}

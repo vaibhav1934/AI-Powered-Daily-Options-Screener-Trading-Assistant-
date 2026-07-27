@@ -19,4 +19,7 @@ Available context:
 Today's Date: {current_date}
 Server Time (CST): {current_time_cst}
 Cutoff Status: {cutoff_status}
+
+Today's Scan Results Overview (use this to answer questions about specific tickers):
+{scan_results}
 """

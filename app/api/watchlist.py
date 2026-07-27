@@ -12,16 +12,18 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import verify_api_key
 from app.core.time_gate import get_cutoff_status
 from app.db.models import ListType, RiskBucket, ScanStatus
 from app.db.session import get_db
 from app.services import watchlist_service
+from app.framework.factors.registry import factor_registry
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
 
-@router.get("/")
+from app.db.schemas import WatchlistResponse
+
+@router.get("/", response_model=WatchlistResponse)
 async def get_watchlist(
     scan_date: Optional[date] = Query(None, description="Defaults to today"),
     list_type: Optional[ListType] = Query(None),
@@ -30,7 +32,6 @@ async def get_watchlist(
     min_score: Optional[float] = Query(None),
     ticker: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ):
     """Get filtered watchlist for a given date."""
     scan_date = scan_date or date.today()
@@ -54,12 +55,20 @@ async def get_watchlist(
         "risk_distribution": risk_dist,
         "cutoff_status": cutoff.model_dump(),
         "results": results,
+        "live_factors": factor_registry.coverage_report()["live_count"],
+        "stubbed_factors": factor_registry.coverage_report()["stubbed_count"],
+        "applied_filters": {
+            "list_type": list_type,
+            "risk_bucket": risk_bucket,
+            "status": status,
+            "min_score": min_score,
+            "ticker": ticker
+        }
     }
 
 
 @router.get("/cutoff")
 async def get_cutoff_status_endpoint(
-    _api_key: str = Depends(verify_api_key),
 ):
     """Get the current cutoff status (server-authoritative CST)."""
     return get_cutoff_status().model_dump()

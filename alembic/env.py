@@ -26,7 +26,8 @@ target_metadata = Base.metadata
 
 # Override sqlalchemy.url from app config
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database.database_url)
+db_url = settings.database.database_url.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:

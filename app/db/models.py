@@ -284,3 +284,41 @@ class MarketDataCache(Base):
             unique=True,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# 6. positions (Paper Trading)
+# ---------------------------------------------------------------------------
+class PositionStatus(str, enum.Enum):
+    """Lifecycle of a paper trading position."""
+
+    OPEN = "open"
+    CLOSED = "closed"
+
+
+class Position(Base):
+    """
+    Paper trading positions for audit and performance tracking.
+    Server-side P&L calculation ensures win rate and returns cannot drift.
+    """
+
+    __tablename__ = "positions"
+
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    qty: Mapped[float] = mapped_column(Float, nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[PositionStatus] = mapped_column(
+        Enum(PositionStatus, name="position_status_enum"),
+        nullable=False,
+        default=PositionStatus.OPEN,
+        index=True,
+    )
+    exit_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    realized_pnl: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    closed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

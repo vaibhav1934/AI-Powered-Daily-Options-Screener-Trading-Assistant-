@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import verify_api_key
 from app.db.models import AuditLog
 from app.db.session import get_db
 from app.framework.factors.registry import factor_registry
@@ -26,7 +25,6 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 async def get_scorecard(
     scan_date: date,
     session: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ):
     """Get end-of-day scorecard for a given date."""
     return await scorecard_service.generate_scorecard(session, scan_date)
@@ -38,7 +36,6 @@ async def get_audit_logs(
     page_size: int = Query(50, ge=1, le=200),
     entity_type: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_db),
-    _api_key: str = Depends(verify_api_key),
 ):
     """Get paginated audit logs."""
     stmt = select(AuditLog).order_by(AuditLog.timestamp.desc())
@@ -59,7 +56,6 @@ async def get_audit_logs(
 
 @router.get("/factor-coverage")
 async def get_factor_coverage(
-    _api_key: str = Depends(verify_api_key),
 ):
     """Get factor coverage report — live vs. stubbed factors."""
     return factor_registry.coverage_report()

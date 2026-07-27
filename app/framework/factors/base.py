@@ -98,6 +98,9 @@ class ScanContext:
     # Sector info
     sector: str = ""
     industry: str = ""
+    name: str = ""  # Company full name from profile
+    change: float = 0.0  # Dollar change (not percent)
+    volume_str: str = ""  # Pre-formatted volume string (e.g. "25.4M")
 
     # Analyst data
     analyst_rating_change: bool = False
