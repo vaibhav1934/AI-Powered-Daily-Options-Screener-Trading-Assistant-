@@ -8,6 +8,7 @@ and lifespan events (startup/shutdown).
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -87,17 +88,22 @@ def create_app() -> FastAPI:
     )
 
     # CORS middleware
+    cors_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
+    ]
+    if os.getenv("CORS_ORIGINS"):
+        cors_origins.extend([o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()])
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:3002",
-            "http://localhost:3003",
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:3001",
-            "http://127.0.0.1:3002",
-        ],
+        allow_origins=cors_origins,
+        allow_origin_regex="https://.*\\.vercel\\.app|https://.*\\.hf\\.space",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
