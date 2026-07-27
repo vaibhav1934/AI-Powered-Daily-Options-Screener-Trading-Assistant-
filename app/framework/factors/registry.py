@@ -65,6 +65,13 @@ class FactorRegistry:
         for factor in live_factors:
             self._factors[factor.factor_id] = factor
 
+        for fid, f in self._factors.items():
+            try:
+                num = int(fid.replace("F", ""))
+                f.layer = (num - 1) // 5 + 1
+            except ValueError:
+                pass
+
         live_count = len(self.get_live_factors())
         stub_count = len(self.get_stubbed_factors())
         logger.info(

@@ -55,17 +55,18 @@ async def get_cached_response(
     expires_at = cached.cached_at + timedelta(seconds=cached.ttl_seconds)
     now = datetime.now(timezone.utc)
 
-    response = dict(cached.response_json)
-    response["_cached_at"] = cached.cached_at.isoformat()
-
-    if now > expires_at:
-        # Stale but labeled — serve it rather than re-hitting API
-        response["_cache_stale"] = True
-        response["_cache_expired_at"] = expires_at.isoformat()
-    else:
-        response["_cache_stale"] = False
-
-    return response
+    if isinstance(cached.response_json, dict):
+        response = dict(cached.response_json)
+        response["_cached_at"] = cached.cached_at.isoformat()
+        if now > expires_at:
+            response["_cache_stale"] = True
+            response["_cache_expired_at"] = expires_at.isoformat()
+        else:
+            response["_cache_stale"] = False
+        return response
+    elif isinstance(cached.response_json, list):
+        return list(cached.response_json)
+    return cached.response_json
 
 
 async def set_cached_response(
@@ -73,7 +74,7 @@ async def set_cached_response(
     provider: str,
     endpoint: str,
     params: dict[str, Any],
-    response_json: dict[str, Any],
+    response_json: Any,
     ttl_seconds: int,
 ) -> None:
     """

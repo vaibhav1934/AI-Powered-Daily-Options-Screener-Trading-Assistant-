@@ -21,9 +21,6 @@ class Layer01Universe(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """
-        L1 uses stub factors F1–F8 (Earnings & Guidance category).
-        These are unconfigured — the layer passes all tickers through.
-        """
+        """L1 uses factors F1-F5 (Price Action / Earnings)."""
         from app.framework.factors.registry import factor_registry
-        return factor_registry.get_factors_for_layer(0)[:8]  # F1–F8 stubs (layer=0)
+        return factor_registry.get_factors_for_layer(self.layer_number)

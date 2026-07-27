@@ -17,14 +17,13 @@ class Layer10Ranking(BaseLayer):
     description = "Final List 1 (daily) + List 2 (monthly) assembly and rank sort."
 
     def get_factors(self) -> list[BaseFactor]:
-        """L10 has no factors — it assembles the output."""
-        return []
+        """L10 uses factors F46-F50 (Position Fit)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)
 
     def process(self, ctx: ScanContext) -> ScanContext:
         """
-        Override process to perform ranking logic instead of factor evaluation.
-        This layer doesn't evaluate factors — it assembles the final output.
+        Evaluate L10 factors and perform ranking/assembly pass-through.
         """
-        # Ranking is handled by the scoring module — this layer is a pass-through
-        # that marks the context as fully processed through all 10 layers.
+        ctx = super().process(ctx)
         return ctx

@@ -34,6 +34,7 @@ class GenericFactor(BaseFactor):
             factor_id=self.factor_id,
             factor_name=self.name,
             layer_number=self.layer,
+            status=self.status,
             triggered=triggered,
             action=self.action if triggered else FactorAction.PASS,
             stubbed=False,

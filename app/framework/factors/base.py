@@ -109,6 +109,9 @@ class ScanContext:
     # SEC filings
     has_recent_shelf_filing: bool = False
     near_ath_proximity: bool = False
+    shelf_filing_date: Optional[str] = None
+    shelf_form_type: Optional[str] = None
+    edgar_check_status: Optional[str] = None
 
     # Time context
     current_time_cst: str = ""

@@ -22,5 +22,6 @@ class Layer03Macro(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """L3 uses F49 and F50 — both are live."""
-        return [F49BOJKOSPIRule(), F50WarTapeRule()]
+        """L3 uses factors F11-F15 (Volatility)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

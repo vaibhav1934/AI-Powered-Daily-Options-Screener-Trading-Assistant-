@@ -22,5 +22,6 @@ class Layer05Binary(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """L5 uses F43 and F47 — both live."""
-        return [F47PreEarningsBinaryExit(), F43ATHRecordEarnings()]
+        """L5 uses factors F21-F25 (Analyst/Sentiment)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

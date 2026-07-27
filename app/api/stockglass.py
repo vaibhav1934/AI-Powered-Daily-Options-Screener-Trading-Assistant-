@@ -91,6 +91,8 @@ async def get_stock_list(
     query_str: Optional[str] = Query(None, alias="q", description="Search symbol or company name"),
     earnings_soon: Optional[bool] = Query(None, alias="earningsSoon", description="Filter to tickers with earnings today"),
     risk_bucket: Optional[str] = Query(None, alias="riskBucket", description="Filter by risk bucket: LOW, MODERATE, HIGH_RISK_HALO"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(10, ge=1, le=100, alias="pageSize", description="Number of items per page (default 10)"),
     session: AsyncSession = Depends(get_db),
     _token: str = Depends(verify_token_scope("read:screener")),
 ):
@@ -104,6 +106,8 @@ async def get_stock_list(
         query_str=query_str,
         earnings_soon=earnings_soon,
         risk_bucket=risk_bucket,
+        page=page,
+        page_size=page_size,
     )
 
 

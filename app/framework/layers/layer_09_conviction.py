@@ -22,5 +22,6 @@ class Layer09Conviction(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """L9 uses F40 — live."""
-        return [F40NoCleanSetup()]
+        """L9 uses factors F41-F45 (Risk Rules)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

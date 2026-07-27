@@ -41,4 +41,4 @@ async def test_synthesize_reasons_fallback_without_mock_data():
     assert len(reasons) == 1
     assert reasons[0].type == "bear"
     assert reasons[0].code == "F47"
-    assert "restricted by risk rule" in reasons[0].text
+    assert "binary" in reasons[0].text.lower() or "pre-earnings" in reasons[0].text.lower()

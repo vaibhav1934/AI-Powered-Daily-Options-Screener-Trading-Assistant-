@@ -22,5 +22,6 @@ class Layer08Analyst(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """L8 uses F41 and F44 — both live."""
-        return [F41BearCaseFirst(), F44AnalystTierWeighting()]
+        """L8 uses factors F36-F40 (News/Catalyst)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

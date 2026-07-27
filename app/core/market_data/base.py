@@ -55,6 +55,7 @@ class NewsItem(BaseModel):
     ticker: Optional[str] = None
     category: Optional[str] = None
     sentiment: Optional[str] = None
+    summary: Optional[str] = None
 
 
 class TechnicalIndicator(BaseModel):

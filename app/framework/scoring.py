@@ -103,12 +103,13 @@ def assign_list_type(ctx: ScanContext) -> str:
     """
     Assign to List 1 (daily) or List 2 (monthly accumulation).
 
-    List 1: High-conviction daily setups with clear catalyst.
-    List 2: Longer-term accumulation candidates.
+    List 1: High-conviction daily setups (score >= 5.5 or clear catalyst/momentum).
+    List 2: Longer-term accumulation candidates or moderate setups.
     """
     has_catalyst = ctx.is_after_hours_beat or ctx.ecosystem_partner_10pct_move
+    has_momentum = (ctx.change_percent is not None and ctx.change_percent > 0.0) or (ctx.rsi is not None and 40 <= ctx.rsi <= 65)
 
-    if has_catalyst and ctx.conviction_score >= 6.0:
+    if (has_catalyst and ctx.conviction_score >= 5.0) or ctx.conviction_score >= 5.5 or (has_momentum and ctx.conviction_score >= 5.0):
         return "LIST_1"
     else:
         return "LIST_2"

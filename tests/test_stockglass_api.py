@@ -44,10 +44,10 @@ class MockSession:
             status=ScanStatus.CONFIRMED,
             entry_price=178.42,
             factor_logs=[
-                FactorLog(id=1, factor_id="F01", factor_name="Trend Factor", triggered=True, vetoed=False),
-                FactorLog(id=2, factor_id="F47", factor_name="Pre-Earnings Exit", triggered=True, vetoed=False),
-                FactorLog(id=3, factor_id="F40", factor_name="Max Drawdown", triggered=False, vetoed=True),
+                FactorLog(id=i+1, factor_id=f"F{i+1:02d}", factor_name=f"Factor {i+1}", layer_number=(i//5)+1, triggered=(i in (0, 46)), vetoed=(i == 39))
+                for i in range(50)
             ],
+            factor_results_json={"market_data": {"name": "NVIDIA Corp", "sector": "Semiconductors"}},
         )
 
     async def execute(self, stmt):
