@@ -169,7 +169,7 @@ class DatabaseConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = Field(
-        default=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./stockglass.db")
+        default=os.getenv("DATABASE_URL", "").strip() or "sqlite+aiosqlite:///./stockglass.db"
     )
 
     # Connection pool
