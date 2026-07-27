@@ -205,14 +205,20 @@ def create_app() -> FastAPI:
 
     # Root endpoint for container health checks and status
     @app.get("/")
+    @app.get("/v1")
     async def root_status():
         return {
             "name": "StockGlass AI Trading Assistant Backend",
             "status": "running",
             "version": "1.0.0",
             "docs_url": "/docs",
-            "health_url": "/health",
+            "health_url": "/v1/health",
         }
+
+    # Suppress harmless browser favicon requests
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def favicon():
+        return JSONResponse(status_code=204, content="")
 
     # Health check
     @app.get("/health")
