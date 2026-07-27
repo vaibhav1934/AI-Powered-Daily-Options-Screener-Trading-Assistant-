@@ -203,6 +203,17 @@ def create_app() -> FastAPI:
     # Register routes
     app.include_router(api_router)
 
+    # Root endpoint for container health checks and status
+    @app.get("/")
+    async def root_status():
+        return {
+            "name": "StockGlass AI Trading Assistant Backend",
+            "status": "running",
+            "version": "1.0.0",
+            "docs_url": "/docs",
+            "health_url": "/health",
+        }
+
     # Health check
     @app.get("/health")
     async def health_check():
