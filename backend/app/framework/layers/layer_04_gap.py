@@ -18,5 +18,6 @@ class Layer04Gap(BaseLayer):
     description = "Validate overnight gap-hold structure before entry."
 
     def get_factors(self) -> list[BaseFactor]:
-        """L4 uses F48 — live."""
-        return [F48GapHoldProtocol()]
+        """L4 uses factors F16-F20 (Earnings Calendar)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

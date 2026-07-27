@@ -47,6 +47,11 @@ class FinnhubClient:
             timeout=30.0,
             headers={"X-Finnhub-Token": self._api_key},
         )
+        try:
+            rate_limiter_registry.get(self.provider_name)
+        except (KeyError, ValueError):
+            from app.core.rate_limiter import init_rate_limiters
+            init_rate_limiters()
 
     async def _request(
         self,
@@ -65,9 +70,11 @@ class FinnhubClient:
                 endpoint=endpoint,
                 params=params,
             )
-            if cached and not cached.get("_cache_stale", False):
-                logger.debug("Cache hit for %s %s", endpoint, params)
-                return cached
+            if cached is not None:
+                is_stale = cached.get("_cache_stale", False) if isinstance(cached, dict) else False
+                if not is_stale:
+                    logger.debug("Cache hit for %s %s", endpoint, params)
+                    return cached
 
         # Acquire rate limit token
         await rate_limiter_registry.acquire(self.provider_name)
@@ -190,9 +197,40 @@ class FinnhubClient:
                         published_at=str(item.get("datetime", "")),
                         ticker=ticker,
                         category=item.get("category", ""),
+                        summary=item.get("summary", ""),
                     )
                 )
         return items
+
+    async def get_daily_candles(
+        self,
+        ticker: str,
+        days: int = 365,
+        session: Any = None,
+    ) -> dict[str, Any]:
+        """
+        Get daily OHLCV candle bars from Finnhub for local technical analysis.
+        Returns dict with keys: 'c', 'h', 'l', 'o', 't', 'v', 's'.
+        """
+        import time
+        now_ts = int(time.time())
+        from_ts = now_ts - (days * 86400)
+        try:
+            data = await self._request(
+                "/stock/candle",
+                {
+                    "symbol": ticker,
+                    "resolution": "D",
+                    "from": from_ts,
+                    "to": now_ts,
+                },
+                session,
+            )
+            if isinstance(data, dict) and data.get("s") == "ok" and data.get("c"):
+                return data
+        except Exception as e:
+            logger.warning("Failed to fetch daily candles for %s from Finnhub: %s", ticker, e)
+        return {}
 
     async def get_technical_indicator(
         self,
@@ -201,12 +239,7 @@ class FinnhubClient:
         session: Any = None,
         **kwargs: Any,
     ) -> list[TechnicalIndicator]:
-        """Finnhub doesn't provide technicals — delegate to Alpha Vantage."""
-        logger.warning(
-            "Finnhub doesn't provide technical indicators. Use Alpha Vantage for %s/%s.",
-            ticker,
-            indicator,
-        )
+        """Finnhub doesn't provide pre-computed technicals — use get_daily_candles + local math."""
         return []
 
     async def get_company_profile(

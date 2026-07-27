@@ -18,5 +18,6 @@ class Layer06Regulatory(BaseLayer):
     description = "Mandatory SEC EDGAR shelf/dilution filing check."
 
     def get_factors(self) -> list[BaseFactor]:
-        """L6 uses F46 — live."""
-        return [F46EDGARShelfCheck()]
+        """L6 uses factors F26-F30 (Macro/Rates)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

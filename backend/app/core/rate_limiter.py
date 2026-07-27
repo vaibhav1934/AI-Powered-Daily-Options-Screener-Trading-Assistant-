@@ -183,3 +183,8 @@ def init_rate_limiters() -> None:
         max_calls=settings.market_data.alpha_vantage_rate_limit,
         window_seconds=86400.0,  # per day
     )
+    rate_limiter_registry.register(
+        provider="sec_edgar",
+        max_calls=10,
+        window_seconds=1.0,  # 10 req/s per SEC EDGAR policy
+    )

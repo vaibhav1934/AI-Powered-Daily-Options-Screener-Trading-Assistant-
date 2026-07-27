@@ -22,5 +22,6 @@ class Layer07TimeGate(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """L7 uses F42 and F45 — both live."""
-        return [F42EntryCutoff(), F45FOMCReduction()]
+        """L7 uses factors F31-F35 (Sector Rotation)."""
+        from app.framework.factors.registry import factor_registry
+        return factor_registry.get_factors_for_layer(self.layer_number)

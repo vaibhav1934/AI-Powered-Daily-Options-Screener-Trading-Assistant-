@@ -36,6 +36,8 @@ export interface FetchStocksParams {
   q?: string;
   earningsSoon?: boolean;
   riskBucket?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export async function fetchStocks(params: FetchStocksParams = {}): Promise<StockListResponse> {
@@ -47,6 +49,8 @@ export async function fetchStocks(params: FetchStocksParams = {}): Promise<Stock
   if (params.q) url.searchParams.append("q", params.q);
   if (params.earningsSoon !== undefined) url.searchParams.append("earningsSoon", params.earningsSoon.toString());
   if (params.riskBucket) url.searchParams.append("riskBucket", params.riskBucket);
+  if (params.page !== undefined) url.searchParams.append("page", params.page.toString());
+  if (params.pageSize !== undefined) url.searchParams.append("pageSize", params.pageSize.toString());
 
   console.log("[FLOW: Frontend API] ──> fetchStocks: Requesting GET", url.toString());
   const res = await fetch(url.toString(), {

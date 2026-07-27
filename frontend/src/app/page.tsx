@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { IndexItem, StockListItem, StockDetail, ChatMessage } from "@/types/stockglass";
 import { fetchIndices, fetchStocks, fetchStockDetail } from "@/lib/stockglass_api";
 import { Navbar } from "@/components/layout/Navbar";
@@ -30,12 +30,25 @@ export default function StockGlassProDashboard() {
   const [minScore, setMinScore] = useState(0);
   const [activeQuick, setActiveQuick] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState("");
+  const selectedSymbolRef = useRef(selectedSymbol);
+  useEffect(() => {
+    selectedSymbolRef.current = selectedSymbol;
+  }, [selectedSymbol]);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set(["NVDA", "PLTR"]));
   const [showFactors, setShowFactors] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [rightPanelMode, setRightPanelMode] = useState<"detail" | "ai_chat">("detail");
   const [sortKey, setSortKey] = useState("score");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  // --- Pagination State ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalStocksCount, setTotalStocksCount] = useState(0);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, activeSector, riskBucket, minScore, activeQuick, query]);
 
   // --- AI Chat State ---
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -61,12 +74,12 @@ export default function StockGlassProDashboard() {
     };
   }, []);
 
-  // 2. Fetch Stock List from Backend (Reactive to filters)
+  // 2. Fetch Stock List from Backend (Reactive to filters and page)
   const loadStocks = useCallback(async () => {
     setLoadingStocks(true);
     setError(null);
     try {
-      const params: any = {};
+      const params: any = { page: currentPage, pageSize: 10 };
       if (activeFilter !== "all") params.list = activeFilter;
       if (activeSector) params.sector = activeSector;
       if (riskBucket) params.riskBucket = riskBucket;
@@ -80,8 +93,10 @@ export default function StockGlassProDashboard() {
       const res = await fetchStocks(params);
       const items = res.results || [];
       setStocks(items);
+      setTotalPages(res.total_pages || 1);
+      setTotalStocksCount(res.total || items.length);
 
-      if (!selectedSymbol && items.length > 0) {
+      if (!selectedSymbolRef.current && items.length > 0) {
         setSelectedSymbol(items[0].symbol);
       }
     } catch (err: any) {
@@ -89,7 +104,7 @@ export default function StockGlassProDashboard() {
     } finally {
       setLoadingStocks(false);
     }
-  }, [activeFilter, activeSector, riskBucket, minScore, activeQuick, query, selectedSymbol]);
+  }, [activeFilter, activeSector, riskBucket, minScore, activeQuick, query, currentPage]);
 
   useEffect(() => {
     loadStocks();
@@ -105,6 +120,22 @@ export default function StockGlassProDashboard() {
         if (isMounted) {
           setSelectedDetail(res);
           setLoadingDetail(false);
+          if (res && res.symbol) {
+            setStocks((prev) =>
+              prev.map((s) =>
+                s.symbol === res.symbol
+                  ? {
+                      ...s,
+                      price: res.price || s.price,
+                      chg: res.chg !== undefined ? res.chg : s.chg,
+                      pct: res.pct !== undefined ? res.pct : s.pct,
+                      sector: res.sector && res.sector !== "Unknown" && res.sector !== "US Equities" ? res.sector : s.sector,
+                      name: res.name || s.name,
+                    }
+                  : s
+              )
+            );
+          }
         }
       })
       .catch((err) => {
@@ -167,7 +198,9 @@ export default function StockGlassProDashboard() {
       style={{
         fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
         background: "#fff",
-        minHeight: "100vh",
+        height: "100vh",
+        maxHeight: "100vh",
+        overflow: "hidden",
         color: "#202124",
         display: "flex",
         flexDirection: "column",
@@ -208,7 +241,7 @@ export default function StockGlassProDashboard() {
       />
 
       {/* Main Split Content Area matching exact prototype layout */}
-      <div style={{ display: "flex", maxWidth: 1400, margin: "0 auto", width: "100%", flex: 1 }}>
+      <div style={{ display: "flex", maxWidth: 1400, margin: "0 auto", width: "100%", flex: 1, minHeight: 0, overflow: "hidden" }}>
         {error ? (
           <div style={{ flex: 1, padding: 40, textAlign: "center", color: "#c5221f" }}>
             <p style={{ fontWeight: 600, fontSize: 16 }}>⚠️ API Connection Issue</p>
@@ -241,7 +274,10 @@ export default function StockGlassProDashboard() {
             onSort={handleSort}
             activeTab={activeFilter}
             onTabChange={(tab) => setActiveFilter(tab)}
-            totalCount={stocks.length}
+            totalCount={totalStocksCount}
+            page={currentPage}
+            totalPages={totalPages}
+            onPageChange={(p) => setCurrentPage(p)}
           />
         )}
 

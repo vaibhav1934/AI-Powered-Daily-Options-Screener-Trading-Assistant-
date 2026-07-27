@@ -121,6 +121,36 @@ export async function uploadScreenshot(scanId: number, file: File): Promise<any>
   return confirmRes.json();
 }
 
+export async function uploadOptionsChainScreenshot(scanId: number, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE_URL}/screenshots/${scanId}/options-chain`, {
+    method: "POST",
+    headers: {
+      "X-API-Key": "dev_key",
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Options chain scan failed: ${err}`);
+  }
+
+  const data = await res.json();
+  
+  // Confirm screenshot to maintain audit trail
+  await fetch(`${API_BASE_URL}/screenshots/${data.id}/confirm`, {
+    method: "POST",
+    headers: {
+      "X-API-Key": "dev_key",
+    }
+  }).catch(() => {});
+
+  return data;
+}
+
 export async function uploadPortfolio(file: File): Promise<any> {
   const formData = new FormData();
   formData.append("file", file);
@@ -140,3 +170,4 @@ export async function uploadPortfolio(file: File): Promise<any> {
 
   return res.json();
 }
+

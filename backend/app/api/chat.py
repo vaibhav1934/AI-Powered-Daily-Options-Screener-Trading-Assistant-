@@ -21,6 +21,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("/")
+@router.post("/query")
 async def chat(
     request: ChatMessageRequest,
     session: AsyncSession = Depends(get_db),

@@ -92,8 +92,8 @@ async def confirm_screenshot(
     # Enforce cutoff — cannot confirm past entry cutoff
     enforce_entry_cutoff()
 
-    # Validate state transition
-    if scan.status != ScanStatus.PENDING_CONFIRMATION:
+    # Validate state transition (allow confirming screenshots on already auto-confirmed scans)
+    if scan.status not in (ScanStatus.PENDING_CONFIRMATION, ScanStatus.CONFIRMED):
         raise InvalidStateTransitionError(
             ticker=scan.ticker,
             current_status=scan.status.value,

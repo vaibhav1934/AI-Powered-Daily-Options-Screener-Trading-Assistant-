@@ -92,6 +92,35 @@ sequenceDiagram
 
 ---
 
+### Workflow 1B: Screener Pagination & Universe Supplementation (`GET /v1/stocks`)
+When the frontend dashboard requests screener setups, the backend combines evaluated DailyScan results with the full 10,419-stock database universe (`StockUniverse`), applying server-side pagination (`page`, `pageSize`) and exact filtering.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Next.js Screener Table UI
+    participant API as StockGlass Router (`stockglass.py`)
+    participant Svc as StockGlass Service (`stockglass_service.py`)
+    participant DB as PostgreSQL (`DailyScan` & `StockUniverse`)
+
+    Client->>API: GET /v1/stocks?list=all&page=1&pageSize=10&q=
+    API->>Svc: get_stock_list(page=1, page_size=10, filters...)
+    Svc->>DB: SELECT * FROM daily_scans WHERE scan_date >= today ORDER BY score DESC
+    DB-->>Svc: Return Scanned Results (Evaluated Setups)
+    
+    alt If no strict evaluation filters (direction, earnings, risk_bucket)
+        Svc->>DB: SELECT * FROM stocks WHERE is_active=True AND match(sector, query)
+        DB-->>Svc: Return Matching Universe Tickers
+        Svc->>Svc: Merge & Deduplicate (Scanned first, then Universe with baseline score 5.0)
+    end
+
+    Svc->>Svc: Calculate Total Count & Slice Page (start_idx to end_idx)
+    Svc-->>API: Return StockListResponseSchema(count=10, total=5210, page=1, total_pages=521, results)
+    API-->>Client: HTTP 200 JSON (Paginated Table Rows & Footer Metadata)
+```
+
+---
+
 ### Workflow 2: On-Demand Stock Detail & AI Synthesis Pipeline (`GET /v1/stocks/{symbol}`)
 When a user selects a ticker, the backend synthesizes real-time news and deterministic factor logs into compliant natural language copy.
 
@@ -113,10 +142,15 @@ sequenceDiagram
         Svc->>DB: SELECT latest scan & factor_logs for NVDA
         Svc->>FH: Fetch live real-time quote (price, chg, pct)
         Svc->>FH: Fetch company news (last 7 days)
+        alt If sector is 'Unknown' or 'US Equities'
+            Svc->>FH: Fetch company profile (get_company_profile)
+            FH-->>Svc: Return real sector (e.g. 'Semiconductors' or 'Technology') & name
+            Svc->>DB: UPDATE stocks SET sector=real_sector, name=real_name WHERE ticker='NVDA'
+        end
     end
     
-    DB-->>Svc: Return DailyScan + 50 FactorLogs
-    FH-->>Svc: Return Live Quote + News Headlines
+    DB-->>Svc: Return DailyScan + 50 FactorLogs + StockUniverse Enrichment
+    FH-->>Svc: Return Live Quote + News Headlines + Profile
     
     Svc->>Syn: synthesize_reasons("NVDA", score, factor_logs, news)
     Syn->>Syn: Filter active factors (triggered or vetoed)
@@ -134,6 +168,43 @@ sequenceDiagram
     
     Syn-->>Svc: Return List[ReasonItem]
     Svc-->>API: Return StockDetailSchema (Drop-in v1 Contract)
+    API-->>User: HTTP 200 JSON Response
+    User->>User: Synchronize live quote (price, chg, pct) & enriched sector into active Screener Table row
+```
+
+---
+
+### Workflow 2B: On-Demand Live Factor Evaluation & Same-Day Caching (`GET /v1/stocks/{symbol}/live`)
+To prevent unnecessary re-execution of heavy EDGAR SEC lookups and Finnhub API calls when a user views a stock multiple times in the same day, the system implements a **Same-Day Database Caching Protocol**.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Frontend Client UI
+    participant API as StockGlass Router (`stockglass.py`)
+    participant Svc as StockGlass Service (`stockglass_service.py`)
+    participant DB as PostgreSQL (`DailyScan` & `StockUniverse`)
+    participant EDGAR as SEC EDGAR Client (`F46EDGARShelfCheck`)
+
+    User->>API: GET /v1/stocks/NVDA
+    API->>Svc: get_stock_detail("NVDA") -> checks cache & evaluates on-demand if needed
+    Svc->>DB: SELECT * FROM daily_scans WHERE ticker='NVDA' AND scan_date=today
+    
+    alt Same-Day Cache Hit (live_evaluated_at == today)
+        Note over Svc,DB: Factor evaluation already completed today.<br>Skip EDGAR & Finnhub calls.
+        DB-->>Svc: Return Cached DailyScan & FactorLogs
+        Svc-->>API: Return StockDetailSchema (Instant Response)
+    else Cache Miss (live_evaluated_at is NULL or older date)
+        Note over Svc,EDGAR: On-demand live factor evaluation triggered.
+        Svc->>DB: SELECT * FROM stocks WHERE symbol='NVDA'
+        DB-->>Svc: Return StockUniverse (cik='0001045810')
+        Svc->>EDGAR: F46EDGARShelfCheck.evaluate(ctx) -> Fetch live SEC submissions
+        EDGAR-->>Svc: Return FactorResult (status='live', action='VETO', detail='...')
+        Svc->>DB: UPDATE daily_scans SET live_evaluated_at=now(), factor_results_json=...
+        Svc->>DB: UPDATE factor_logs SET triggered=..., vetoed=..., result_detail_json=...
+        DB-->>Svc: Commit Transaction
+        Svc-->>API: Return Updated StockDetailSchema
+    end
     API-->>User: HTTP 200 JSON Response
 ```
 
@@ -258,14 +329,29 @@ The backend uses **SQLAlchemy 2.0 (Async)** with PostgreSQL / Supabase, mapped d
 
 ```mermaid
 erDiagram
+    STOCK_UNIVERSE ||--o{ DAILY_SCANS : "1-to-many (ticker)"
     DAILY_SCANS ||--o{ FACTOR_LOGS : "1-to-many (scan_id)"
+    
+    STOCK_UNIVERSE {
+        string symbol PK
+        string company_name
+        string exchange
+        string cik
+        string sector
+        string industry
+        datetime created_at
+        datetime updated_at
+    }
+
     DAILY_SCANS {
         int id PK
-        string ticker
+        string ticker FK
         date scan_date
         float score
         string risk_bucket
         string veto_reason
+        date live_evaluated_at
+        jsonb factor_results_json
         datetime created_at
     }
     
@@ -299,6 +385,12 @@ erDiagram
         datetime added_at
     }
 ```
+
+### The Same-Day Database Caching Protocol (`live_evaluated_at`)
+To optimize API latency and rate-limit consumption for heavy institutional checks (such as SEC EDGAR F46 dilution checks):
+1. **Initial Seed & Morning Scan:** Tickers are loaded from `stocks` (StockUniverse) and scanned daily. During the initial morning batch scan, `live_evaluated_at` is set to `NULL` for on-demand factors.
+2. **First User View (Cache Miss):** When `GET /v1/stocks/{symbol}/live` is invoked, the service checks if `live_evaluated_at` matches today's UTC date. If not, it executes real-time EDGAR lookups using the CIK from `stocks`, updates `FactorLog` records, and sets `live_evaluated_at = today`.
+3. **Subsequent Views (Cache Hit):** Any subsequent requests for the same ticker on the same day detect `live_evaluated_at == today` and immediately return the cached factor evaluations without external API calls.
 
 ### Runtime Detail JSONB (`result_detail_json`)
 To support rich hover tooltips in the frontend factor modal without hardcoding static strings, `FactorLog` stores a JSONB blob containing runtime metrics evaluated during the scan:
@@ -345,3 +437,22 @@ FORBIDDEN_ADVISORY_PATTERNS = [
 ### 3. Database Resilience & Connection Sizing
 * **Global 503 Exception Handler:** In `app/main.py`, SQLAlchemy operational errors and database disconnects are intercepted globally, returning a clean `503 Service Unavailable` JSON response with code `DATABASE_UNAVAILABLE` rather than crashing or leaking stack traces.
 * **Connection Pooling:** Configured in `app/db/session.py` with `pool_size=5`, `max_overflow=10`, and `pool_pre_ping=True` to handle transient network drops gracefully in serverless/cloud environments.
+
+### 4. Streamlined Scan Status Lifecycle & Immediate Execution Accessibility
+To provide a frictionless user experience for institutional traders and eliminate unnecessary speed bumps (FR-7 / FR-16 streamlining):
+* **Auto-Confirmation of Valid Scans:** Any stock that successfully passes the 50-factor deterministic evaluation without triggering a mandatory veto rule initializes directly in `CONFIRMED` status (rather than requiring a manual TradingView screenshot upload to transition from `PENDING_CONFIRMATION`).
+* **Immediate Execution Details:** Because valid setups initialize as `CONFIRMED`, execution details (`entry_price`, `strike_price`, `stop_loss`) are immediately accessible to the user in the UI dashboard and authorized for explanation by the AI Assistant in the chat panel.
+* **Veto / Cutoff Locking:** If a setup triggers an active veto rule (e.g., F40 No Clean Setup or F46 Dilution) or is evaluated after the institutional entry cutoff time, its status is strictly set to `LOCKED`, withholding execution details and preventing actionable trades.
+
+### 5. Complete AI Context Injection & Automated Options Contract Selection
+To ensure institutional-grade explanations and strict compliance with the Zero-Mock Data policy:
+* **Automated Options Contract Selector (`options_service.py`):** In strict adherence to the prohibition against simulated data, strike prices are never calculated using arbitrary percentage multipliers (e.g., flat 5% OTM heuristics). `options_service.py` integrates with `yfinance` to automatically query real exchange option chains and select institutional Call/Put contracts matching target Delta (~0.30 to 0.45) and expiration windows (30–45 DTE). When a live options chain feed is unavailable, `strike_price` evaluates to `NULL` (`None`) and renders as `"N/A - Requires Live Options Chain Feed"`.
+* **Local Vectorized Technical Indicator Engine (`technicals.py`):** Technical indicators (RSI, SMA 50/200) are computed locally using vectorized `pandas`/`numpy` math on daily OHLCV bars fetched via `yfinance` and Finnhub, eliminating external indicator rate limits while ensuring precision and reproducibility.
+
+### 6. AI News Catalyst Synthesis & Zero-Mock News Policy
+To provide traders with institutional clarity on market narratives without risking simulated or advisory content:
+* **Concurrent Catalyst Synthesis:** When a user opens the Stock Detail view (`GET /v1/stocks/{symbol}`), the backend concurrently executes `synthesize_reasons` (for score bullets) and `synthesize_news_summary` (for full narrative summary) via `asyncio.gather`.
+* **Institutional Catalyst Summary:** `synthesize_news_summary` feeds up to 5 recent news articles (headlines, summaries, sources) from Finnhub directly to the LLM to generate an objective, 2-sentence institutional summary of the market narrative, fundamental catalyst, or macroeconomic impact. `NewsItemSchema` explicitly includes `summary: Optional[str]` to guarantee end-to-end data integrity.
+* **Strict Compliance & Zero-Mock Fallback:** All generated summaries must pass `check_compliance(text)`. If an article feed is empty, the LLM is offline, or compliance rejects the text, `newsSummary` evaluates to `null` (`None`) without generating simulated summaries or mock market stories. The UI displays an italicized notification or hides the box cleanly.
+
+

@@ -18,13 +18,16 @@ from app.api.screenshots import router as screenshots_router
 from app.api.stockglass import router as stockglass_router
 from app.api.watchlist import router as watchlist_router
 
-api_router = APIRouter(prefix="/v1", dependencies=[Depends(verify_api_key)])
+api_router = APIRouter(prefix="/v1")
+internal_router = APIRouter(dependencies=[Depends(verify_api_key)])
 
-api_router.include_router(scans_router)
-api_router.include_router(debug_router)
-api_router.include_router(screenshots_router)
-api_router.include_router(watchlist_router)
-api_router.include_router(chat_router)
-api_router.include_router(admin_router)
-api_router.include_router(portfolio_router)
+internal_router.include_router(scans_router)
+internal_router.include_router(debug_router)
+internal_router.include_router(screenshots_router)
+internal_router.include_router(watchlist_router)
+internal_router.include_router(chat_router)
+internal_router.include_router(admin_router)
+internal_router.include_router(portfolio_router)
+
+api_router.include_router(internal_router)
 api_router.include_router(stockglass_router)

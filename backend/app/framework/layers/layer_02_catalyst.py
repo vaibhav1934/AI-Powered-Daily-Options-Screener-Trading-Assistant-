@@ -20,8 +20,6 @@ class Layer02Catalyst(BaseLayer):
     )
 
     def get_factors(self) -> list[BaseFactor]:
-        """L2 maps to stub factors F9–F15 (Technical/Price Structure)."""
+        """L2 uses factors F6-F10 (Volume/Flow)."""
         from app.framework.factors.registry import factor_registry
-        # Return stubs for this layer — will be activated when defined
-        factors = factor_registry.get_factors_for_layer(0)
-        return [f for f in factors if f.factor_id in {f"F{i:02d}" for i in range(9, 16)}]
+        return factor_registry.get_factors_for_layer(self.layer_number)

@@ -76,8 +76,7 @@ class AlphaVantageClient:
                 params=params,
             )
             if cached is not None:
-                # Serve even stale data rather than burning API calls
-                stale_flag = cached.get("_cache_stale", False)
+                stale_flag = cached.get("_cache_stale", False) if isinstance(cached, dict) else False
                 if stale_flag:
                     logger.info(
                         "Serving stale cached data for %s %s (preserving daily quota)",

@@ -34,6 +34,9 @@ export interface StockListItem {
 export interface StockListResponse {
   count: number;
   total: number;
+  page?: number;
+  page_size?: number;
+  total_pages?: number;
   results: StockListItem[];
   // Alias for backwards compat
   items?: StockListItem[];
@@ -58,6 +61,7 @@ export interface NewsItem {
 }
 
 export interface StockDetail {
+  id?: number;
   symbol: string;
   name: string;
   sector: string;
@@ -70,6 +74,12 @@ export interface StockDetail {
   layerScores: LayerScoreItem[];
   reasons: ReasonItem[];
   news: NewsItem[];
+  newsSummary?: string | null;
+  execution_details?: {
+    entry_price?: number;
+    strike_price?: number | null;
+    stop_loss?: number;
+  };
 }
 
 export interface FactorBreakdownItem {

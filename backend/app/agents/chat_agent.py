@@ -15,6 +15,7 @@ from app.agents.client import LLMClient
 from app.agents.system_prompt import SYSTEM_PROMPT_TEMPLATE
 from app.core.time_gate import get_cst_now, get_cutoff_status
 from app.services.scan_service import get_scan_results
+from app.services.synthesis_service import check_compliance
 
 logger = logging.getLogger(__name__)
 
@@ -91,12 +92,38 @@ async def process_chat_message(
     today_results = await get_scan_results(session, now.date())
     scan_summary = []
     for r in today_results:
+        market_data = {}
+        factor_evaluations = []
+        if r.factor_results_json and isinstance(r.factor_results_json, dict):
+            market_data = r.factor_results_json.get("market_data", {})
+            for f in r.factor_results_json.get("results", []):
+                if f.get("triggered") or f.get("vetoed") or f.get("status") == "live":
+                    factor_evaluations.append({
+                        "id": f.get("factor_id"),
+                        "name": f.get("factor_name"),
+                        "layer": f.get("layer_number"),
+                        "status": f.get("status"),
+                        "triggered": f.get("triggered"),
+                        "vetoed": f.get("vetoed"),
+                        "detail": f.get("detail"),
+                    })
+
         scan_summary.append({
             "ticker": r.ticker,
+            "name": market_data.get("name", ""),
+            "sector": market_data.get("sector", ""),
             "score": r.score,
             "status": r.status.value,
+            "risk_bucket": r.risk_bucket.value if r.risk_bucket else "UNASSIGNED",
             "veto_rule": r.veto_rule,
-            "veto_reason": r.veto_reason
+            "veto_reason": r.veto_reason,
+            "execution_details": {
+                "entry_price": r.entry_price,
+                "strike_price": r.strike_price,
+                "stop_loss": r.stop_loss,
+            },
+            "live_market_data": market_data,
+            "factor_evaluations_and_news": factor_evaluations,
         })
         
     sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(
@@ -124,6 +151,10 @@ async def process_chat_message(
         async for chunk in stream:
             if chunk["type"] == "chunk":
                 current_text += chunk["content"]
+                if not check_compliance(current_text):
+                    logger.warning("[COMPLIANCE INTERVENTION] Advisory violation in chat stream. Redacting response.")
+                    yield {"type": "error", "content": "\n\n[COMPLIANCE INTERVENTION: Response terminated per institutional compliance rules prohibiting direct trading recommendations (e.g. 'buy', 'sell', 'target price').]"}
+                    return
                 yield chunk
             elif chunk["type"] == "tool_call":
                 # For Gemini, args might already be parsed dict

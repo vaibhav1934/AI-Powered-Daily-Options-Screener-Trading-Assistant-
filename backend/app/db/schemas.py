@@ -316,6 +316,9 @@ class StockListItemSchema(BaseModel):
 class StockListResponseSchema(BaseModel):
     count: int
     total: int
+    page: int = 1
+    page_size: int = 10
+    total_pages: int = 1
     results: list[StockListItemSchema]
 
 
@@ -335,9 +338,11 @@ class NewsItemSchema(BaseModel):
     source: str
     publishedAt: str
     url: str
+    summary: Optional[str] = None
 
 
 class StockDetailSchema(BaseModel):
+    id: Optional[int] = None
     symbol: str
     name: str
     sector: str
@@ -350,6 +355,8 @@ class StockDetailSchema(BaseModel):
     layerScores: list[LayerScoreItem]
     reasons: list[ReasonItem]
     news: list[NewsItemSchema]
+    newsSummary: Optional[str] = None
+    execution_details: Optional[dict[str, Any]] = None
 
 
 class FactorBreakdownItem(BaseModel):

@@ -211,6 +211,9 @@ def _build_scan_context(
         # SEC
         has_recent_shelf_filing=ticker_data.get("has_recent_shelf_filing", False),
         near_ath_proximity=ticker_data.get("near_ath_proximity", False),
+        shelf_filing_date=ticker_data.get("shelf_filing_date"),
+        shelf_form_type=ticker_data.get("shelf_form_type"),
+        edgar_check_status=ticker_data.get("edgar_check_status"),
         # Time
         current_time_cst=macro_context.get("current_time_cst", ""),
         is_past_cutoff=macro_context.get("is_past_cutoff", False),

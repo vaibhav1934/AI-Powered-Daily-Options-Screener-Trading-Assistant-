@@ -1,12 +1,14 @@
 """
 Database ORM Models
 ====================
-PostgreSQL schema — 5 tables:
-  1. daily_scans     — Per-ticker scan results with status lifecycle
+PostgreSQL schema — 7 tables:
+  1. daily_scans     — Per-ticker scan results with status lifecycle & same-day caching
   2. factor_logs     — Granular factor breakdown per scan (F1–F50)
   3. screenshots     — Screenshot audit trail, per ticker per day
   4. audit_logs      — All state changes, filter edits, confirmations
   5. market_data_cache — Postgres-backed cache for market data API responses
+  6. positions       — Paper trading positions with server-side P&L
+  7. stocks          — Universe table of ~6,000 tickers with SEC CIK, exchange, and sector
 
 All times are server-authoritative, stored in UTC, evaluated in America/Chicago.
 """
@@ -93,8 +95,7 @@ class AuditAction(str, enum.Enum):
 class DailyScan(Base):
     """
     Per-ticker scan result for a given day.
-    Status lifecycle: PENDING_CONFIRMATION → CONFIRMED → LOCKED
-    Execution details (price/strike) are NOT returned for PENDING_CONFIRMATION status (FR-7).
+    Status lifecycle: CONFIRMED (default for valid scans) → LOCKED
     """
 
     __tablename__ = "daily_scans"
@@ -109,7 +110,7 @@ class DailyScan(Base):
     status: Mapped[ScanStatus] = mapped_column(
         Enum(ScanStatus, name="scan_status_enum"),
         nullable=False,
-        default=ScanStatus.PENDING_CONFIRMATION,
+        default=ScanStatus.CONFIRMED,
     )
     list_type: Mapped[Optional[ListType]] = mapped_column(
         Enum(ListType, name="list_type_enum"), nullable=True
@@ -117,6 +118,9 @@ class DailyScan(Base):
     factor_results_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     veto_rule: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     veto_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    live_evaluated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Execution details — ONLY returned when status != PENDING_CONFIRMATION
     entry_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -322,3 +326,30 @@ class Position(Base):
     closed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+# ---------------------------------------------------------------------------
+# 7. stocks (Stock Universe Table)
+# ---------------------------------------------------------------------------
+class StockUniverse(Base):
+    """
+    Universe table storing ~6,000 tickers, company names, exchanges, and SEC CIK numbers.
+    Used for instant baseline screener rendering and SEC EDGAR dilution filing queries.
+    """
+
+    __tablename__ = "stocks"
+
+    ticker: Mapped[str] = mapped_column(String(20), primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    sector: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    exchange: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    cik: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+

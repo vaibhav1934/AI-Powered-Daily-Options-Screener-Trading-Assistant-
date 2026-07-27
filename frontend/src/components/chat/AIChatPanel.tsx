@@ -18,6 +18,77 @@ const QUICK_PROMPTS = [
   { label: "Filter by Low Risk", prompt: "How does this ticker align with low risk options strategy criteria?" },
 ];
 
+function parseInline(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
+      return (
+        <strong key={index} style={{ fontWeight: 600, color: "#202124" }}>
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("*") && part.endsWith("*") && part.length >= 2 && !part.startsWith("**")) {
+      return (
+        <em key={index} style={{ fontStyle: "italic" }}>
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+    if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
+      return (
+        <code key={index} style={{ background: "rgba(0,0,0,0.06)", padding: "1px 4px", borderRadius: 4, fontFamily: "monospace", fontSize: "0.9em", color: "#d93025" }}>
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
+
+function renderFormattedMessage(text: string): React.ReactNode {
+  const lines = text.split("\n");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          return <div key={index} style={{ height: 4 }} />;
+        }
+        if (trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+          const headingText = trimmed.replace(/^#+\s*/, "");
+          return (
+            <div key={index} style={{ fontWeight: 600, fontSize: 13.5, color: "#1a73e8", marginTop: 4 }}>
+              {parseInline(headingText)}
+            </div>
+          );
+        }
+        if (trimmed.startsWith("* ") || trimmed.startsWith("- ") || trimmed.startsWith("• ")) {
+          const bulletText = trimmed.replace(/^[\*\-•]\s*/, "");
+          return (
+            <div key={index} style={{ display: "flex", gap: 6, paddingLeft: 4, marginTop: 2 }}>
+              <span style={{ color: "#1a73e8", fontWeight: 700 }}>•</span>
+              <div>{parseInline(bulletText)}</div>
+            </div>
+          );
+        }
+        if (/^\d+\.\s/.test(trimmed)) {
+          const match = trimmed.match(/^(\d+\.)\s*(.*)$/);
+          const num = match ? match[1] : "1.";
+          const listText = match ? match[2] : trimmed;
+          return (
+            <div key={index} style={{ display: "flex", gap: 6, paddingLeft: 4, marginTop: 2 }}>
+              <span style={{ color: "#1a73e8", fontWeight: 600, minWidth: 16 }}>{num}</span>
+              <div>{parseInline(listText)}</div>
+            </div>
+          );
+        }
+        return <div key={index}>{parseInline(line)}</div>;
+      })}
+    </div>
+  );
+}
+
 export function AIChatPanel({
   symbol,
   item,
@@ -89,7 +160,7 @@ User Query: ${textToSend}`,
   return (
     <div style={{ borderLeft: "1px solid #e8eaed", width: 360, flexShrink: 0, background: "#fff", display: "flex", flexDirection: "column", height: "100%", fontFamily: "'Google Sans', Roboto, Arial, sans-serif", color: "#202124" }}>
       {/* Header */}
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <MessageSquare size={18} color="#1a73e8" />
           <span style={{ fontSize: 16, fontWeight: 500 }}>AI Assistant</span>
@@ -101,7 +172,7 @@ User Query: ${textToSend}`,
       </div>
 
       {/* Chat History */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
         {messages.length === 0 ? (
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
             <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#1a73e8", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -136,14 +207,16 @@ User Query: ${textToSend}`,
                   fontSize: 13,
                   lineHeight: 1.5,
                   maxWidth: "85%",
-                  whiteSpace: "pre-wrap",
+                  whiteSpace: isUser ? "pre-wrap" : "normal",
                   background: isUser ? "#e8f0fe" : "#f8f9fa",
                   color: isUser ? "#1a73e8" : "#202124",
                   border: isUser ? "1px solid #d2e3fc" : "1px solid #e8eaed",
                   fontWeight: isUser ? 500 : 400,
                 }}
               >
-                {msg.content || (isStreaming && i === messages.length - 1 ? (
+                {msg.content ? (
+                  isUser ? msg.content : renderFormattedMessage(msg.content)
+                ) : (isStreaming && i === messages.length - 1 ? (
                   <span style={{ color: "#5f6368", fontStyle: "italic" }}>Computing factors...</span>
                 ) : null)}
               </div>
@@ -154,7 +227,7 @@ User Query: ${textToSend}`,
       </div>
 
       {/* Chat Input */}
-      <div style={{ padding: "14px 16px", borderTop: "1px solid #e8eaed", background: "#fff" }}>
+      <div style={{ padding: "14px 16px", borderTop: "1px solid #e8eaed", background: "#fff", flexShrink: 0 }}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
