@@ -49,34 +49,57 @@ async def trigger_scan(
 
     logger.info("Scan triggered: job_id=%s, date=%s", job_id, scan_date)
 
-    # Log audit
-    audit = AuditLog(
-        action=AuditAction.SCAN_TRIGGERED,
-        entity_type="scan",
-        detail_json={"job_id": job_id, "scan_date": scan_date.isoformat()},
-    )
-    session.add(audit)
+    from app.db.session import async_session_factory
+    from datetime import timedelta
+
+    # --- Phase 1: Quick DB read (short-lived session) ---
+    # Write the audit log and read already-scanned tickers in one short transaction.
+    _day_start = datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
+    _day_end = _day_start + timedelta(days=1)
+
+    async with async_session_factory() as read_session:
+        audit = AuditLog(
+            action=AuditAction.SCAN_TRIGGERED,
+            entity_type="scan",
+            detail_json={"job_id": job_id, "scan_date": scan_date.isoformat()},
+        )
+        read_session.add(audit)
+        already_scanned_result = await read_session.execute(
+            select(DailyScan.ticker).where(
+                DailyScan.scan_date >= _day_start,
+                DailyScan.scan_date < _day_end,
+            )
+        )
+        already_scanned_tickers = {row[0] for row in already_scanned_result.fetchall()}
+        await read_session.commit()
 
     # Build macro context from server-authoritative time
     now = get_cst_now()
-    
+
     kospi_change = 0.0
     ceasefire = False
-    
+
+    # --- Phase 2: Finnhub data fetch (each subtask uses its own session) ---
+    # This phase can take 30-90 seconds. We do NOT hold any DB session open here.
+    tickers: list[dict[str, Any]] = []
+    calendar: list[Any] = []
+
     try:
         from app.core.market_data.finnhub import FinnhubClient
         client = FinnhubClient()
-        
-        # 1. Fetch KOSPI proxy (using EWY - iShares MSCI South Korea ETF as proxy if ^KS11 fails)
+
+        # 1. Fetch KOSPI proxy
         try:
-            kospi_quote = await client.get_quote("EWY", session=session)
-            kospi_change = kospi_quote.change_percent
+            async with async_session_factory() as tmp:
+                kospi_quote = await client.get_quote("EWY", session=tmp)
+                kospi_change = kospi_quote.change_percent
         except Exception:
             pass
-            
+
         # 2. Fetch general news for ceasefire keyword
         try:
-            news_items = await client.get_news(category="general", session=session)
+            async with async_session_factory() as tmp:
+                news_items = await client.get_news(category="general", session=tmp)
             for item in news_items:
                 headline = item.headline.lower()
                 if "ceasefire" in headline or "de-escalation" in headline or "peace" in headline:
@@ -84,48 +107,17 @@ async def trigger_scan(
                     break
         except Exception:
             pass
-            
-    except Exception as e:
-        logger.error("Failed to initialize Finnhub client for macro: %s", e)
 
-    macro_context = {
-        "kospi_change_percent": kospi_change,
-        "ceasefire_headline": ceasefire,
-        "is_fomc_day": is_fomc_day(now),
-        "fomc_time_past_1245": is_fomc_day(now) and now.hour >= 12 and now.minute >= 45,
-        "current_time_cst": now.strftime("%I:%M %p"),
-        "is_past_cutoff": is_past_cutoff(now),
-        "is_friday": is_friday(now),
-    }
-
-    # Attempt to fetch from Finnhub if API key is configured
-    tickers: list[dict[str, Any]] = []
-    
-    try:
         logger.info("Fetching real earnings calendar from Finnhub for %s", scan_date)
-        from app.db.session import async_session_factory
-        async with async_session_factory() as macro_session:
-            calendar = await client.get_earnings_calendar(from_date=scan_date, to_date=scan_date, session=macro_session)
+        async with async_session_factory() as tmp:
+            calendar = await client.get_earnings_calendar(from_date=scan_date, to_date=scan_date, session=tmp)
 
-        # Determine how many tickers have already been scanned today to compute offset
-        from datetime import timedelta
-        _day_start = datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
-        _day_end = _day_start + timedelta(days=1)
-        already_scanned_result = await session.execute(
-            select(DailyScan.ticker).where(
-                DailyScan.scan_date >= _day_start,
-                DailyScan.scan_date < _day_end,
-            )
-        )
-        already_scanned_tickers = {row[0] for row in already_scanned_result.fetchall()}
-        offset = len(already_scanned_tickers)
-        
         logger.info(
-            "Earnings calendar has %d tickers. Already scanned today: %d. Starting from offset %d.",
-            len(calendar), offset, offset
+            "Earnings calendar has %d tickers. Already scanned today: %d.",
+            len(calendar), len(already_scanned_tickers)
         )
-        
-        if offset >= len(calendar):
+
+        if len(already_scanned_tickers) >= len(calendar) and len(calendar) > 0:
             logger.info("All %d tickers in today's earnings calendar have already been scanned.", len(calendar))
             return {
                 "job_id": job_id,
@@ -136,9 +128,10 @@ async def trigger_scan(
                 "factor_coverage": factor_registry.coverage_report(),
             }
 
-        # Slice the next batch based on offset, skipping already-scanned tickers
+        # Slice the next batch, skipping already-scanned tickers
         remaining = [e for e in calendar if e.ticker not in already_scanned_tickers]
         calendar_subset = remaining[:batch_size]
+
         
         sem = asyncio.Semaphore(5)
         
@@ -188,8 +181,18 @@ async def trigger_scan(
         await client.close()
     except Exception as e:
         logger.error("Finnhub fetch failed. Is FINNHUB_API_KEY set? Error: %s", e)
-    
-    # Fallback to empty if Finnhub failed completely or returned nothing
+
+    macro_context = {
+        "kospi_change_percent": kospi_change,
+        "ceasefire_headline": ceasefire,
+        "is_fomc_day": is_fomc_day(now),
+        "fomc_time_past_1245": is_fomc_day(now) and now.hour >= 12 and now.minute >= 45,
+        "current_time_cst": now.strftime("%I:%M %p"),
+        "is_past_cutoff": is_past_cutoff(now),
+        "is_friday": is_friday(now),
+    }
+
+    # Safety guard: abort if no data to avoid wiping existing DB records
     if not tickers:
         logger.warning("No real market data fetched. Aborting scan to preserve existing data.")
         return {
@@ -200,115 +203,115 @@ async def trigger_scan(
             "factor_coverage": factor_registry.coverage_report(),
         }
 
-    # Run deterministic scan
+    # Run deterministic scan (pure CPU work, no DB session needed)
     scan_results = run_full_scan(tickers, macro_context, scan_date)
 
-    # Only delete rows for tickers we are about to RE-scan (incremental, not full wipe)
+    # --- Phase 3: Write results (fresh short-lived write session) ---
+    # Open a brand-new connection for the write so we are not reusing a stale one.
     batch_tickers = [t["ticker"] for t in tickers]
-    if batch_tickers:
-        from datetime import timedelta as _td
-        _ds = datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
-        await session.execute(
-            delete(DailyScan).where(
-                DailyScan.scan_date >= _ds,
-                DailyScan.scan_date < _ds + _td(days=1),
-                DailyScan.ticker.in_(batch_tickers),
+    async with async_session_factory() as write_session:
+        if batch_tickers:
+            await write_session.execute(
+                delete(DailyScan).where(
+                    DailyScan.scan_date >= _day_start,
+                    DailyScan.scan_date < _day_end,
+                    DailyScan.ticker.in_(batch_tickers),
+                )
             )
-        )
-    await session.flush()
+        await write_session.flush()
 
-    # Persist results
-    persisted_count = 0
-    for ctx in scan_results:
-        # Map risk bucket
-        risk_bucket = _map_risk_bucket(ctx)
-        list_type = _map_list_type(ctx)
+        # Persist results
+        persisted_count = 0
+        for ctx in scan_results:
+            # Map risk bucket
+            risk_bucket = _map_risk_bucket(ctx)
+            list_type = _map_list_type(ctx)
 
-        # Calculate target execution zones based on technicals and conviction
-        entry_target = ctx.current_price if ctx.current_price > 0 else None
-        strike_target = None
-        stop_target = None
-        
-        option_contract_res = None
-        if entry_target is not None:
-            # Determine bias: Bullish if price > SMA50 or RSI < 30. Bearish if RSI > 70 or gap down.
-            is_bullish = True
-            if (ctx.rsi and ctx.rsi > 70) or (ctx.change_percent and ctx.change_percent < -2.0) or ctx.veto_rule == "F43" or ctx.veto_rule == "F49":
-                is_bullish = False
-                
-            option_contract_res = await get_automated_option_contract(ctx.ticker, ctx.current_price, is_bullish)
-            if option_contract_res:
-                strike_target = option_contract_res["strike_price"]
-            else:
-                strike_target = None  # Requires live options chain feed (no mock 5% data per rule)
-                
-            if is_bullish:
-                stop_target = round(ctx.sma_50 * 0.98, 2) if ctx.sma_50 else None
-            else:
-                stop_target = round(ctx.sma_50 * 1.02, 2) if ctx.sma_50 else None
+            # Calculate target execution zones based on technicals and conviction
+            entry_target = ctx.current_price if ctx.current_price > 0 else None
+            strike_target = None
+            stop_target = None
+            
+            option_contract_res = None
+            if entry_target is not None:
+                # Determine bias: Bullish if price > SMA50 or RSI < 30. Bearish if RSI > 70 or gap down.
+                is_bullish = True
+                if (ctx.rsi and ctx.rsi > 70) or (ctx.change_percent and ctx.change_percent < -2.0) or ctx.veto_rule == "F43" or ctx.veto_rule == "F49":
+                    is_bullish = False
+                    
+                option_contract_res = await get_automated_option_contract(ctx.ticker, ctx.current_price, is_bullish)
+                if option_contract_res:
+                    strike_target = option_contract_res["strike_price"]
+                else:
+                    strike_target = None  # Requires live options chain feed
+                    
+                if is_bullish:
+                    stop_target = round(ctx.sma_50 * 0.98, 2) if ctx.sma_50 else None
+                else:
+                    stop_target = round(ctx.sma_50 * 1.02, 2) if ctx.sma_50 else None
 
-        scan_entry = DailyScan(
-            scan_date=datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc),
-            ticker=ctx.ticker,
-            score=ctx.conviction_score,
-            risk_bucket=risk_bucket,
-            status=ScanStatus.LOCKED if ctx.is_vetoed or macro_context["is_past_cutoff"] else ScanStatus.CONFIRMED,
-            list_type=list_type,
-            factor_results_json={
-                "results": [r.model_dump() for r in ctx.factor_results],
-                "coverage": factor_registry.coverage_report(),
-                "market_data": {
-                    "price": ctx.current_price,
-                    "gap": ctx.change_percent,
-                    "change": ctx.change,
-                    "rsi": ctx.rsi,
-                    "sma_50": ctx.sma_50,
-                    "sma_200": ctx.sma_200,
-                    "name": ctx.name,
-                    "sector": ctx.sector,
-                    "volume": ctx.volume_str,
-                    "has_earnings_today": ctx.has_earnings_today,
-                    "option_contract": option_contract_res,
-                }
+            scan_entry = DailyScan(
+                scan_date=datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc),
+                ticker=ctx.ticker,
+                score=ctx.conviction_score,
+                risk_bucket=risk_bucket,
+                status=ScanStatus.LOCKED if ctx.is_vetoed or macro_context["is_past_cutoff"] else ScanStatus.CONFIRMED,
+                list_type=list_type,
+                factor_results_json={
+                    "results": [r.model_dump() for r in ctx.factor_results],
+                    "coverage": factor_registry.coverage_report(),
+                    "market_data": {
+                        "price": ctx.current_price,
+                        "gap": ctx.change_percent,
+                        "change": ctx.change,
+                        "rsi": ctx.rsi,
+                        "sma_50": ctx.sma_50,
+                        "sma_200": ctx.sma_200,
+                        "name": ctx.name,
+                        "sector": ctx.sector,
+                        "volume": ctx.volume_str,
+                        "has_earnings_today": ctx.has_earnings_today,
+                        "option_contract": option_contract_res,
+                    }
+                },
+                veto_rule=ctx.veto_rule,
+                veto_reason=ctx.veto_reason,
+                entry_price=entry_target,
+                strike_price=strike_target,
+                stop_loss=stop_target,
+            )
+            write_session.add(scan_entry)
+            await write_session.flush()
+
+            # Persist factor logs
+            for fr in ctx.factor_results:
+                factor_log = FactorLog(
+                    scan_id=scan_entry.id,
+                    factor_id=fr.factor_id,
+                    factor_name=fr.factor_name,
+                    layer_number=fr.layer_number,
+                    triggered=fr.triggered,
+                    vetoed=fr.vetoed,
+                    stubbed=fr.stubbed,
+                    result_detail_json=fr.model_dump(),
+                )
+                write_session.add(factor_log)
+
+            persisted_count += 1
+
+        # Audit completion
+        audit_complete = AuditLog(
+            action=AuditAction.SCAN_COMPLETED,
+            entity_type="scan",
+            detail_json={
+                "job_id": job_id,
+                "scan_date": scan_date.isoformat(),
+                "tickers_scanned": persisted_count,
+                "factor_coverage": factor_registry.coverage_report(),
             },
-            veto_rule=ctx.veto_rule,
-            veto_reason=ctx.veto_reason,
-            entry_price=entry_target,
-            strike_price=strike_target,
-            stop_loss=stop_target,
         )
-        session.add(scan_entry)
-        await session.flush()
-
-        # Persist factor logs
-        for fr in ctx.factor_results:
-            factor_log = FactorLog(
-                scan_id=scan_entry.id,
-                factor_id=fr.factor_id,
-                factor_name=fr.factor_name,
-                layer_number=fr.layer_number,
-                triggered=fr.triggered,
-                vetoed=fr.vetoed,
-                stubbed=fr.stubbed,
-                result_detail_json=fr.model_dump(),
-            )
-            session.add(factor_log)
-
-        persisted_count += 1
-
-    # Audit completion
-    audit_complete = AuditLog(
-        action=AuditAction.SCAN_COMPLETED,
-        entity_type="scan",
-        detail_json={
-            "job_id": job_id,
-            "scan_date": scan_date.isoformat(),
-            "tickers_scanned": persisted_count,
-            "factor_coverage": factor_registry.coverage_report(),
-        },
-    )
-    session.add(audit_complete)
-    await session.commit()
+        write_session.add(audit_complete)
+        await write_session.commit()
 
     return {
         "job_id": job_id,
