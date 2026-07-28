@@ -455,4 +455,69 @@ To provide traders with institutional clarity on market narratives without riski
 * **Institutional Catalyst Summary:** `synthesize_news_summary` feeds up to 5 recent news articles (headlines, summaries, sources) from Finnhub directly to the LLM to generate an objective, 2-sentence institutional summary of the market narrative, fundamental catalyst, or macroeconomic impact. `NewsItemSchema` explicitly includes `summary: Optional[str]` to guarantee end-to-end data integrity.
 * **Strict Compliance & Zero-Mock Fallback:** All generated summaries must pass `check_compliance(text)`. If an article feed is empty, the LLM is offline, or compliance rejects the text, `newsSummary` evaluates to `null` (`None`) without generating simulated summaries or mock market stories. The UI displays an italicized notification or hides the box cleanly.
 
+---
+
+## 10. Agentic AI Architecture — Chat Agent & Autonomous Scan Triggering
+
+### Overview
+StockGlass AI uses a **Single-Node Agentic Architecture** built natively on the Anthropic/Gemini SDK (no LangChain, no CrewAI). The Chat Agent operates on a **ReAct (Reason + Act) loop**: it receives a user query, decides if it needs live data, autonomously triggers Python Tool functions, reads the results, and formulates the final response.
+
+### Agent Tools (Function Calling)
+The agent (`app/agents/chat_agent.py`) has access to the following tools:
+
+| Tool | Purpose |
+|---|---|
+| `get_scan_results` | Fetch today's scanned tickers from DB filtered by status / risk bucket |
+| `explain_ticker` | Deep-explain why a ticker was ranked or vetoed by specific framework rules |
+| `apply_ui_filter` | Apply real-time filter on the screener table (e.g., "show only LOW risk") |
+| `trigger_scan` | **Autonomously trigger the full 50-factor / 10-layer scan for today** |
+
+### Proactive Scan Trigger Behaviour
+When the agent detects that today's scan dataset is **empty** (`scan_empty=True`):
+1. The agent proactively informs the user: *"No scan data found for today. Would you like me to trigger the full 50-factor scan now?"*
+2. The agent **never** triggers the scan automatically — it always asks for explicit user confirmation first.
+3. When the user confirms (e.g., *"yes", "run it", "go ahead"*), the agent calls `trigger_scan(confirmed=True)`.
+4. The agent streams real-time feedback: ⚙️ starting → ✅ complete with ticker counts.
+5. The user is instructed to refresh the screener table to see the newly populated results.
+
+### Why No Automatic Scheduler?
+The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sleeps after ~15 minutes of inactivity. An internal `APScheduler` set to 6:30 AM CST would be unreliable because the Space will likely be sleeping at that time. The Agentic "on-demand with confirmation" model is the correct, reliable solution for free-tier cloud deployments.
+
+### GenAI Components
+| Component | File | Model | Purpose |
+|---|---|---|---|
+| Chat Agent Orchestrator | `app/agents/chat_agent.py` | Gemini / Claude | ReAct loop, tool calling, streaming responses |
+| News Synthesis Agent | `app/services/synthesis_service.py` | Gemini / Claude | Unstructured news → structured Bull/Bear bullets |
+| Vision AI Options Extractor | `app/api/screenshots.py` | Gemini Vision / Claude Vision | Screenshot → structured options chain JSON |
+
+---
+
+## 11. Deployment Architecture
+
+### Cloud Stack
+| Layer | Platform | Notes |
+|---|---|---|
+| **Backend** | Hugging Face Spaces (CPU Basic) | Dockerized FastAPI on port 7860, public access required |
+| **Frontend** | Vercel (Next.js) | Edge-deployed; `NEXT_PUBLIC_API_URL` env var must be set to HF URL |
+| **Database** | Supabase (PostgreSQL) | `DATABASE_URL` secret set in HF Spaces Variables |
+
+### Critical Deployment Notes
+* **HF Space must be PUBLIC:** The frontend (Vercel) makes direct browser `fetch()` calls to the HF backend. If the Space is Private, HF intercepts all unauthenticated requests and returns an HTML 404 page, breaking the API.
+* **API_SECRET_KEY must be set in HF Secrets:** The frontend sends `X-API-Key: dev_key` on every request. The backend validates this against `API_SECRET_KEY` from environment. If missing, the backend falls back to `"change-me-in-production"` which causes 401 errors.
+* **Trailing newlines in HF secrets:** Pasting secrets manually in the HF UI often appends `\n`. The `DATABASE_URL` field validator in `config.py` strips these automatically using `@field_validator`.
+* **`/chat` POST trailing slash:** FastAPI's trailing-slash redirect (307) on `POST /chat/` converts POST to GET, breaking the SSE stream. Both `@router.post("")` and `@router.post("/")` are registered to prevent this.
+* **Root & fallback routes:** All API routes are registered under both `/v1/...` (canonical) and `/...` (fallback) prefixes to handle missing `/v1` in frontend environment variables.
+* **CORS:** `allow_origin_regex` covers `*.vercel.app` and `*.hf.space` wildcard domains for all preview and production deployments.
+
+### Required Hugging Face Secrets
+| Secret Name | Value | Required? |
+|---|---|---|
+| `DATABASE_URL` | `postgresql+asyncpg://...` from Supabase | ✅ Yes |
+| `API_SECRET_KEY` | `dev_key` (match frontend `X-API-Key`) | ✅ Yes |
+| `GEMINI_API_KEY` | Google Gemini API key | ✅ For GenAI features |
+| `FINNHUB_API_KEY` | Finnhub API key | ✅ For market data |
+| `ALPHA_VANTAGE_API_KEY` | Alpha Vantage key | ✅ For technicals |
+
+
+
 
