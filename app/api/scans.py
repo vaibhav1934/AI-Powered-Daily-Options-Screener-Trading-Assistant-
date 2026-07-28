@@ -22,10 +22,11 @@ router = APIRouter(prefix="/scans", tags=["scans"])
 @router.post("/trigger")
 async def trigger_scan(
     scan_date: Optional[date] = None,
+    batch_size: int = Query(default=20, ge=1, le=100, description="Number of tickers to scan per run. Subsequent calls scan the next batch."),
     session: AsyncSession = Depends(get_db),
 ):
-    """Manually trigger a full-universe scan."""
-    result = await scan_service.trigger_scan(session, scan_date)
+    """Manually trigger an incremental scan. Each call scans the next unseen batch from today's earnings calendar."""
+    result = await scan_service.trigger_scan(session, scan_date, batch_size=batch_size)
     return result
 
 
