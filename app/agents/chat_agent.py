@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.client import LLMClient
 from app.agents.system_prompt import SYSTEM_PROMPT_TEMPLATE
 from app.core.time_gate import get_cst_now, get_cutoff_status
-from app.services.scan_service import get_scan_results
+from app.services.scan_service import get_scan_results, trigger_scan
 from app.services.synthesis_service import check_compliance
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,17 @@ def get_available_tools() -> List[Dict[str, Any]]:
                     "value": {"type": "string", "description": "The value to filter against as a string"}
                 },
                 "required": ["field", "operator", "value"]
+            }
+        },
+        {
+            "name": "trigger_scan",
+            "description": "Trigger the full 50-factor / 10-layer universe scan for today. Use this when the user explicitly asks to run or trigger the scan, OR when scan data is empty and the user confirms they want to start it. Do NOT call this automatically without user confirmation.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "confirmed": {"type": "boolean", "description": "Must be true — user has confirmed they want to trigger the scan."}
+                },
+                "required": ["confirmed"]
             }
         }
     ]
@@ -125,11 +136,13 @@ async def process_chat_message(
             "factor_evaluations_and_news": factor_evaluations,
         })
         
+        scan_empty = len(scan_summary) == 0
     sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         current_date=now.strftime("%Y-%m-%d"),
         current_time_cst=now.strftime("%I:%M %p"),
         cutoff_status=json.dumps(get_cutoff_status().model_dump()),
-        scan_results=json.dumps(scan_summary, indent=2)
+        scan_results=json.dumps(scan_summary, indent=2),
+        scan_empty=scan_empty,
     )
 
     tools = get_available_tools()
@@ -172,6 +185,25 @@ async def process_chat_message(
         if current_tool_name and current_tool_args_str:
             try:
                 args = json.loads(current_tool_args_str)
+                tool_result = None
+
+                # Execute the tool
+                if current_tool_name == "trigger_scan":
+                    if args.get("confirmed") is True:
+                        yield {"type": "chunk", "content": "\n\n⚙️ **Triggering full 50-factor scan now...** This may take 30–90 seconds. I'll report back when complete.\n"}
+                        try:
+                            result = await trigger_scan(session)
+                            scanned = result.get("scanned", 0)
+                            confirmed = result.get("confirmed", 0)
+                            vetoed = result.get("vetoed", 0)
+                            tool_result = f"Scan complete. Tickers scanned: {scanned}. Confirmed: {confirmed}. Vetoed: {vetoed}."
+                            yield {"type": "chunk", "content": f"\n✅ **Scan complete!** Scanned **{scanned}** tickers → **{confirmed}** confirmed, **{vetoed}** vetoed. Refresh the screener table to see results!\n"}
+                        except Exception as scan_err:
+                            tool_result = f"Scan failed: {str(scan_err)}"
+                            yield {"type": "chunk", "content": f"\n❌ **Scan failed**: {str(scan_err)}\n"}
+                    else:
+                        tool_result = "Scan not triggered — user confirmation required."
+
                 yield {"type": "tool_call", "name": current_tool_name, "args": args}
             except json.JSONDecodeError:
                 pass
