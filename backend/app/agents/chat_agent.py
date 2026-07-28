@@ -203,7 +203,13 @@ async def process_chat_message(
                             except Exception as scan_err:
                                 logger.error("Background scan failed: %s", scan_err, exc_info=True)
 
-                        asyncio.create_task(_run_scan_background())
+                        task = asyncio.create_task(_run_scan_background())
+                        global _bg_tasks
+                        if '_bg_tasks' not in globals():
+                            globals()['_bg_tasks'] = set()
+                        _bg_tasks.add(task)
+                        task.add_done_callback(_bg_tasks.discard)
+                        
                         yield {"type": "chunk", "content": "\n\n⚙️ **Scan triggered!** The full 50-factor / 10-layer scan is now running in the background. This typically takes 30–90 seconds.\n\n📋 **What to do next:**\n1. Wait about 60 seconds for the scan to complete.\n2. Refresh the screener table page to see the newly scanned tickers.\n3. Come back to the chat and ask me anything about the results!\n"}
                     else:
                         tool_result = "Scan not triggered — user confirmation required."
