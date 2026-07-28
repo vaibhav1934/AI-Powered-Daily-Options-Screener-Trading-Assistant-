@@ -190,7 +190,10 @@ async def process_chat_message(
 
                 # Execute the tool
                 if "trigger_scan" in current_tool_name:
-                    if args.get("confirmed") is True:
+                    confirmed_val = args.get("confirmed", False)
+                    is_confirmed = confirmed_val is True or str(confirmed_val).lower() in ["true", "1", "yes", "y"]
+                    
+                    if is_confirmed:
                         # Run scan as background task so the SSE stream doesn't timeout
                         import asyncio
                         from app.db.session import async_session_factory
@@ -213,6 +216,8 @@ async def process_chat_message(
                         yield {"type": "chunk", "content": "\n\n⚙️ **Scan triggered!** The full 50-factor / 10-layer scan is now running in the background. This typically takes 30–90 seconds.\n\n📋 **What to do next:**\n1. Wait about 60 seconds for the scan to complete.\n2. Refresh the screener table page to see the newly scanned tickers.\n3. Come back to the chat and ask me anything about the results!\n"}
                     else:
                         tool_result = "Scan not triggered — user confirmation required."
+                        yield {"type": "chunk", "content": "\n\n⚠️ **Scan cancelled:** I need your explicit confirmation to run the scan. Please reply with 'yes' or 'run scan'."}
+
 
                 yield {"type": "tool_call", "name": current_tool_name, "args": args}
             except json.JSONDecodeError:
