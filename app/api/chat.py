@@ -20,6 +20,7 @@ from app.db.schemas import ChatMessageRequest
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+@router.post("")
 @router.post("/")
 @router.post("/query")
 async def chat(
