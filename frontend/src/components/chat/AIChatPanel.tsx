@@ -163,7 +163,7 @@ User Query: ${textToSend}`,
         );
       } else if (!accumulated) {
         onUpdateLastAssistantMessage(
-          `❌ **Live AI Engine Error:** Unable to reach backend chat server (${err.message || "Connection failed"}). Ensure uvicorn is running on port 8001.`
+          `❌ **Live AI Engine Error:** Unable to reach backend chat server (${err.message || "Connection failed"}). Please try again in a moment.`
         );
       } else {
         onUpdateLastAssistantMessage(accumulated + `\n\n*[Stream interrupted: ${err.message}]*`);
