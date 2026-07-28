@@ -135,8 +135,8 @@ async def process_chat_message(
             "live_market_data": market_data,
             "factor_evaluations_and_news": factor_evaluations,
         })
-        
-        scan_empty = len(scan_summary) == 0
+    
+    scan_empty = len(scan_summary) == 0
     sys_prompt = SYSTEM_PROMPT_TEMPLATE.format(
         current_date=now.strftime("%Y-%m-%d"),
         current_time_cst=now.strftime("%I:%M %p"),
