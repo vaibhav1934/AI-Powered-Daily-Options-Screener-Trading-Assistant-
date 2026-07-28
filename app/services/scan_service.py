@@ -281,13 +281,12 @@ async def get_scan_results(
     risk_bucket_filter: Optional[RiskBucket] = None,
 ) -> list[DailyScan]:
     """Get scan results for a given date with optional filters."""
+    from datetime import timedelta
+    day_start = datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
+    day_end = datetime.combine(scan_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
     stmt = select(DailyScan).where(
-        DailyScan.scan_date >= datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc),
-        DailyScan.scan_date < datetime.combine(
-            scan_date.replace(day=scan_date.day + 1) if scan_date.day < 28 else scan_date,
-            datetime.min.time(),
-            tzinfo=timezone.utc,
-        ),
+        DailyScan.scan_date >= day_start,
+        DailyScan.scan_date < day_end,
     )
 
     if status_filter:
