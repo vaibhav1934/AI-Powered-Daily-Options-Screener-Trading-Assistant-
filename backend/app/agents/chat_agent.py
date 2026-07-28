@@ -169,11 +169,12 @@ async def process_chat_message(
                     return
                 yield chunk
             elif chunk["type"] == "tool_call":
+                current_tool_name = chunk["name"]
                 # For Gemini, args might already be parsed dict
-                if isinstance(chunk.get("args"), dict) and chunk["args"]:
+                if isinstance(chunk.get("args"), dict):
+                    current_tool_args_str = json.dumps(chunk["args"])
                     yield chunk
                 else:
-                    current_tool_name = chunk["name"]
                     current_tool_args_str = ""
             elif chunk["type"] == "tool_call_delta":
                 current_tool_args_str += chunk["partial_json"]
@@ -188,7 +189,7 @@ async def process_chat_message(
                 tool_result = None
 
                 # Execute the tool
-                if current_tool_name == "trigger_scan":
+                if "trigger_scan" in current_tool_name:
                     if args.get("confirmed") is True:
                         # Run scan as background task so the SSE stream doesn't timeout
                         import asyncio
