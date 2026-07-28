@@ -160,7 +160,14 @@ async def trigger_scan(
     
     # Fallback to empty if Finnhub failed completely or returned nothing
     if not tickers:
-        logger.warning("No real market data fetched. Ensure FINNHUB_API_KEY is valid.")
+        logger.warning("No real market data fetched. Aborting scan to preserve existing data.")
+        return {
+            "job_id": job_id,
+            "scan_date": scan_date.isoformat(),
+            "tickers_scanned": 0,
+            "status": "ABORTED_NO_DATA",
+            "factor_coverage": factor_registry.coverage_report(),
+        }
 
     # Run deterministic scan
     scan_results = run_full_scan(tickers, macro_context, scan_date)
@@ -263,7 +270,7 @@ async def trigger_scan(
         },
     )
     session.add(audit_complete)
-    await session.flush()
+    await session.commit()
 
     return {
         "job_id": job_id,
