@@ -190,17 +190,20 @@ async def process_chat_message(
                 # Execute the tool
                 if current_tool_name == "trigger_scan":
                     if args.get("confirmed") is True:
-                        yield {"type": "chunk", "content": "\n\n⚙️ **Triggering full 50-factor scan now...** This may take 30–90 seconds. I'll report back when complete.\n"}
-                        try:
-                            result = await trigger_scan(session)
-                            scanned = result.get("scanned", 0)
-                            confirmed = result.get("confirmed", 0)
-                            vetoed = result.get("vetoed", 0)
-                            tool_result = f"Scan complete. Tickers scanned: {scanned}. Confirmed: {confirmed}. Vetoed: {vetoed}."
-                            yield {"type": "chunk", "content": f"\n✅ **Scan complete!** Scanned **{scanned}** tickers → **{confirmed}** confirmed, **{vetoed}** vetoed. Refresh the screener table to see results!\n"}
-                        except Exception as scan_err:
-                            tool_result = f"Scan failed: {str(scan_err)}"
-                            yield {"type": "chunk", "content": f"\n❌ **Scan failed**: {str(scan_err)}\n"}
+                        # Run scan as background task so the SSE stream doesn't timeout
+                        import asyncio
+                        from app.db.session import async_session_factory
+
+                        async def _run_scan_background():
+                            try:
+                                async with async_session_factory() as bg_session:
+                                    result = await trigger_scan(bg_session)
+                                    logger.info("Background scan complete: %s", result)
+                            except Exception as scan_err:
+                                logger.error("Background scan failed: %s", scan_err, exc_info=True)
+
+                        asyncio.create_task(_run_scan_background())
+                        yield {"type": "chunk", "content": "\n\n⚙️ **Scan triggered!** The full 50-factor / 10-layer scan is now running in the background. This typically takes 30–90 seconds.\n\n📋 **What to do next:**\n1. Wait about 60 seconds for the scan to complete.\n2. Refresh the screener table page to see the newly scanned tickers.\n3. Come back to the chat and ask me anything about the results!\n"}
                     else:
                         tool_result = "Scan not triggered — user confirmation required."
 
