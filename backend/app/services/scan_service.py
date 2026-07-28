@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 async def trigger_scan(
     session: AsyncSession,
     scan_date: Optional[date] = None,
+    batch_size: int = 20,
 ) -> dict[str, Any]:
     """
     Trigger a full-universe scan for the given date.
@@ -105,9 +106,39 @@ async def trigger_scan(
         from app.db.session import async_session_factory
         async with async_session_factory() as macro_session:
             calendar = await client.get_earnings_calendar(from_date=scan_date, to_date=scan_date, session=macro_session)
+
+        # Determine how many tickers have already been scanned today to compute offset
+        from datetime import timedelta
+        _day_start = datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
+        _day_end = _day_start + timedelta(days=1)
+        already_scanned_result = await session.execute(
+            select(DailyScan.ticker).where(
+                DailyScan.scan_date >= _day_start,
+                DailyScan.scan_date < _day_end,
+            )
+        )
+        already_scanned_tickers = {row[0] for row in already_scanned_result.fetchall()}
+        offset = len(already_scanned_tickers)
         
-        # Limit to 20 to avoid exhausting rate limits on free tier
-        calendar_subset = calendar[:20] if len(calendar) > 20 else calendar
+        logger.info(
+            "Earnings calendar has %d tickers. Already scanned today: %d. Starting from offset %d.",
+            len(calendar), offset, offset
+        )
+        
+        if offset >= len(calendar):
+            logger.info("All %d tickers in today's earnings calendar have already been scanned.", len(calendar))
+            return {
+                "job_id": job_id,
+                "scan_date": scan_date.isoformat(),
+                "tickers_scanned": 0,
+                "status": "ALL_SCANNED",
+                "message": f"All {len(calendar)} tickers in today's earnings calendar have already been scanned.",
+                "factor_coverage": factor_registry.coverage_report(),
+            }
+
+        # Slice the next batch based on offset, skipping already-scanned tickers
+        remaining = [e for e in calendar if e.ticker not in already_scanned_tickers]
+        calendar_subset = remaining[:batch_size]
         
         sem = asyncio.Semaphore(5)
         
@@ -172,11 +203,18 @@ async def trigger_scan(
     # Run deterministic scan
     scan_results = run_full_scan(tickers, macro_context, scan_date)
 
-    await session.execute(
-        delete(DailyScan).where(
-            DailyScan.scan_date == datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
+    # Only delete rows for tickers we are about to RE-scan (incremental, not full wipe)
+    batch_tickers = [t["ticker"] for t in tickers]
+    if batch_tickers:
+        from datetime import timedelta as _td
+        _ds = datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc)
+        await session.execute(
+            delete(DailyScan).where(
+                DailyScan.scan_date >= _ds,
+                DailyScan.scan_date < _ds + _td(days=1),
+                DailyScan.ticker.in_(batch_tickers),
+            )
         )
-    )
     await session.flush()
 
     # Persist results
