@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { IndexItem, StockListItem, StockDetail, ChatMessage } from "@/types/stockglass";
+import { Sparkles, X, BarChart2 } from "lucide-react";
 import { fetchIndices, fetchStocks, fetchStockDetail } from "@/lib/stockglass_api";
 import { Navbar } from "@/components/layout/Navbar";
 import { IndicesStrip } from "@/components/screener/IndicesStrip";
@@ -22,6 +23,8 @@ export default function StockGlassProDashboard() {
   const [loadingStocks, setLoadingStocks] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [indicesError, setIndicesError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   // --- UI Filter & Navigation State ---
   const [query, setQuery] = useState("");
@@ -37,7 +40,7 @@ export default function StockGlassProDashboard() {
   }, [selectedSymbol]);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set(["NVDA", "PLTR"]));
   const [showFactors, setShowFactors] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [rightPanelMode, setRightPanelMode] = useState<"detail" | "ai_chat">("detail");
   const [sortKey, setSortKey] = useState("score");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -60,9 +63,21 @@ export default function StockGlassProDashboard() {
   // --- AI Chat State ---
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
+  // --- Mobile State ---
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 850);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // 1. Fetch Top Indices on Mount
   useEffect(() => {
     let isMounted = true;
+    setIndicesError(null);
     fetchIndices()
       .then((res) => {
         if (isMounted) {
@@ -70,9 +85,10 @@ export default function StockGlassProDashboard() {
           setLoadingIndices(false);
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
         if (isMounted) {
-          console.error("Indices load failed:", err);
+          console.warn("Indices load failed");
+          setIndicesError(err?.message || "Not available");
           setLoadingIndices(false);
         }
       });
@@ -152,6 +168,7 @@ export default function StockGlassProDashboard() {
     if (!selectedSymbol) return;
     let isMounted = true;
     setLoadingDetail(true);
+    setDetailError(null);
     fetchStockDetail(selectedSymbol)
       .then((res) => {
         if (isMounted) {
@@ -166,6 +183,8 @@ export default function StockGlassProDashboard() {
                       price: res.price || s.price,
                       chg: res.chg !== undefined ? res.chg : s.chg,
                       pct: res.pct !== undefined ? res.pct : s.pct,
+                      volume: res.volume || s.volume,
+                      score: res.score !== undefined ? res.score : s.score,
                       sector: res.sector && res.sector !== "Unknown" && res.sector !== "US Equities" ? res.sector : s.sector,
                       name: res.name || s.name,
                     }
@@ -175,9 +194,10 @@ export default function StockGlassProDashboard() {
           }
         }
       })
-      .catch((err) => {
+      .catch((err: any) => {
         if (isMounted) {
-          console.error(`Detail load failed for ${selectedSymbol}:`, err);
+          console.warn(`Detail load failed for ${selectedSymbol}`);
+          setDetailError(err?.message || "Detail not available");
           setLoadingDetail(false);
         }
       });
@@ -226,9 +246,53 @@ export default function StockGlassProDashboard() {
   const handleAskAi = (prompt: string) => {
     setRightPanelMode("ai_chat");
     setChatMessages((prev) => [...prev, { role: "user", content: prompt }, { role: "assistant", content: "" }]);
+    if (isMobile) {
+      setShowMobilePanel(true);
+    }
+  };
+
+  const handleSelectSymbol = (sym: string) => {
+    setSelectedSymbol(sym);
+    if (isMobile) {
+      setShowMobilePanel(true);
+    }
   };
 
   const activeItem = useMemo(() => stocks.find((s) => s.symbol === selectedSymbol) || null, [stocks, selectedSymbol]);
+
+  const renderRightPanel = () => (
+    <AuthOverlay
+      featureName={rightPanelMode === "detail" ? "Setup Detail & Factor Breakdown" : "AI Trading Assistant & Chat"}
+      description="Log in with your administrator or trader credentials to unlock deep-dive screener analytics, options chain execution, and interactive AI chat."
+    >
+      {rightPanelMode === "detail" ? (
+        <DetailPanel
+          symbol={selectedSymbol}
+          detail={selectedDetail}
+          loading={loadingDetail}
+          error={detailError}
+          onOpenFactors={() => setShowFactors(true)}
+          onAskAi={handleAskAi}
+        />
+      ) : (
+        <AIChatPanel
+          symbol={selectedSymbol}
+          item={activeItem}
+          messages={chatMessages}
+          onAddMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
+          onUpdateLastAssistantMessage={(content) => {
+            setChatMessages((prev) => {
+              const next = [...prev];
+              if (next.length > 0 && next[next.length - 1].role === "assistant") {
+                next[next.length - 1].content = content;
+              }
+              return next;
+            });
+          }}
+        />
+      )}
+    </AuthOverlay>
+  );
 
   return (
     <div
@@ -247,18 +311,18 @@ export default function StockGlassProDashboard() {
       <Navbar
         query={query}
         onQueryChange={setQuery}
-        showFilters={showFilters}
-        onToggleFilters={() => setShowFilters((s) => !s)}
         rightPanelMode={rightPanelMode}
         onRightPanelModeChange={setRightPanelMode}
+        isMobile={isMobile}
       />
 
       {/* Market Proxy Strip */}
-      <IndicesStrip indices={indices} loading={loadingIndices} />
+      <IndicesStrip indices={indices} loading={loadingIndices} error={indicesError} />
 
       {/* Quick Filter Bar & Panel */}
       <QuickFilters
         showFilters={showFilters}
+        onToggleFilters={() => setShowFilters((s) => !s)}
         activeSector={activeSector}
         onSectorToggle={setActiveSector}
         minScore={minScore}
@@ -303,7 +367,7 @@ export default function StockGlassProDashboard() {
             items={sortedStocks}
             loading={loadingStocks}
             selectedSymbol={selectedSymbol}
-            onSelect={setSelectedSymbol}
+            onSelect={handleSelectSymbol}
             watchlist={watchlist}
             onToggleWatch={toggleWatch}
             sortKey={sortKey}
@@ -315,42 +379,99 @@ export default function StockGlassProDashboard() {
             page={currentPage}
             totalPages={totalPages}
             onPageChange={(p) => setCurrentPage(p)}
+            isMobile={isMobile}
           />
         )}
 
-        <div style={{ width: rightPanelMode === "detail" ? 380 : 440, flexShrink: 0, height: "100%", overflow: "hidden", display: "flex", flexDirection: "column", transition: "width 0.2s ease" }}>
-          <AuthOverlay
-            featureName={rightPanelMode === "detail" ? "Setup Detail & Factor Breakdown" : "AI Trading Assistant & Chat"}
-            description="Log in with your administrator or trader credentials to unlock deep-dive screener analytics, options chain execution, and interactive AI chat."
-          >
-            {rightPanelMode === "detail" ? (
-              <DetailPanel
-                symbol={selectedSymbol}
-                detail={selectedDetail}
-                loading={loadingDetail}
-                onOpenFactors={() => setShowFactors(true)}
-                onAskAi={handleAskAi}
-              />
-            ) : (
-              <AIChatPanel
-                symbol={selectedSymbol}
-                item={activeItem}
-                messages={chatMessages}
-                onAddMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
-                onUpdateLastAssistantMessage={(content) => {
-                  setChatMessages((prev) => {
-                    const next = [...prev];
-                    if (next.length > 0 && next[next.length - 1].role === "assistant") {
-                      next[next.length - 1].content = content;
-                    }
-                    return next;
-                  });
-                }}
-              />
-            )}
-          </AuthOverlay>
-        </div>
+        {!isMobile && (
+          <div style={{ width: rightPanelMode === "detail" ? 380 : 440, flexShrink: 0, height: "100%", overflow: "hidden", display: "flex", flexDirection: "column", transition: "width 0.2s ease" }}>
+            {renderRightPanel()}
+          </div>
+        )}
       </div>
+
+      {/* Mobile Bottom Sheet / Modal */}
+      {isMobile && showMobilePanel && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+          {/* Backdrop */}
+          <div 
+            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} 
+            onClick={() => setShowMobilePanel(false)}
+          />
+          {/* Panel */}
+          <div style={{ 
+            position: "relative", 
+            background: "#fff", 
+            width: "100%", 
+            height: "85vh", 
+            borderTopLeftRadius: 20, 
+            borderTopRightRadius: 20, 
+            display: "flex", 
+            flexDirection: "column",
+            overflow: "hidden",
+            boxShadow: "0 -4px 16px rgba(0,0,0,0.1)",
+            animation: "slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
+          }}>
+            <style>{`
+              @keyframes slideUp {
+                from { transform: translateY(100%); }
+                to { transform: translateY(0); }
+              }
+            `}</style>
+            
+            {/* Header / Handle */}
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8f9fa" }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setRightPanelMode("detail")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 16,
+                    border: "none",
+                    background: rightPanelMode === "detail" ? "#e8f0fe" : "transparent",
+                    color: rightPanelMode === "detail" ? "#1a73e8" : "#5f6368",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6
+                  }}
+                >
+                  <BarChart2 size={14} /> Setup
+                </button>
+                <button
+                  onClick={() => setRightPanelMode("ai_chat")}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 16,
+                    border: "none",
+                    background: rightPanelMode === "ai_chat" ? "#1a73e8" : "transparent",
+                    color: rightPanelMode === "ai_chat" ? "#fff" : "#5f6368",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6
+                  }}
+                >
+                  <Sparkles size={14} /> AI
+                </button>
+              </div>
+              <button 
+                onClick={() => setShowMobilePanel(false)}
+                style={{ background: "none", border: "none", padding: 8, color: "#5f6368" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Content Container */}
+            <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+              {renderRightPanel()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Full 50-Factor Log Modal */}
       {showFactors && (

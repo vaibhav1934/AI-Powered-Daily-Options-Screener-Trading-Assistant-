@@ -24,7 +24,7 @@ class F41BearCaseFirst(BaseFactor):
         "Any bullish setup must survive a bear-case pass. "
         "Downgrade conviction if the bear case is strong."
     )
-    layer = 8
+    layer = 9
     status = FactorStatus.LIVE
 
     # Conviction reduction when bear case is strong

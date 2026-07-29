@@ -24,7 +24,7 @@ class F48GapHoldProtocol(BaseFactor):
         "When an overnight gap is present, validate gap-hold structure "
         "before entry. Gap must hold for setup to remain valid."
     )
-    layer = 4
+    layer = 10
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:

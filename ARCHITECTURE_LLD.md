@@ -518,6 +518,40 @@ The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sl
 | `FINNHUB_API_KEY` | Finnhub API key | ✅ For market data |
 | `ALPHA_VANTAGE_API_KEY` | Alpha Vantage key | ✅ For technicals |
 
+---
 
+## 11. Scan Pipeline — Design & Fixes (2026-07-28)
+
+### How the Scan Pipeline Works
+
+1. **Trigger**: `POST /v1/scans/trigger` (or via AI chat tool `trigger_scan`) calls `scan_service.trigger_scan()`.
+2. **Earnings Calendar**: Fetches today's earnings list from Finnhub (`/calendar/earnings?from=DATE&to=DATE`).
+3. **Rolling Offset / Pagination**: Before slicing, the service queries the `daily_scans` table to find which tickers have already been scanned today. It skips those and takes the **next `batch_size` (default 20)** unseen tickers.
+4. **Concurrent Fetch**: For each ticker in the batch, it concurrently fetches quote, technicals, and company profile (5-at-a-time semaphore to respect free-tier rate limits).
+5. **Safety Guard**: If Finnhub returns 0 tickers (API error / no data), the scan **aborts early** and returns `status: ABORTED_NO_DATA` — it never wipes existing database records.
+6. **Scoring**: `run_full_scan()` evaluates all 50 factors across 10 layers for each ticker.
+7. **Incremental Persist**: Only the new batch's tickers are deleted and re-inserted — not the entire day's data.
+8. **Commit**: `session.commit()` is called at the end to permanently save all rows to Supabase.
+9. **All Done**: When all tickers in the calendar are scanned, returns `status: ALL_SCANNED`.
+
+### Key Files
+| File | Role |
+|---|---|
+| `backend/app/services/scan_service.py` | Core scan pipeline, offset pagination, DB persistence |
+| `backend/app/api/scans.py` | REST endpoints (`POST /trigger`, `GET /{date}`) |
+| `backend/app/agents/chat_agent.py` | AI tool executor — triggers scan via chat, offloads to `asyncio.create_task` |
+
+### Bug Fixes Applied
+| Bug | Symptom | Fix |
+|---|---|---|
+| `session.flush()` instead of `session.commit()` | Scan ran successfully but no rows saved to DB | Changed final flush to `session.commit()` |
+| Gemini tool args not saved to `current_tool_name` | Tool call detected by frontend but silently never executed | Fixed Gemini streaming branch to always set `current_tool_name` before yielding |
+| `confirmed is True` strict bool check | Gemini passes `"true"` string; scan was silently cancelled | Relaxed to check `str(val).lower() in ["true","yes","1"]` |
+| `asyncio.create_task()` GC'd immediately | Background scan task destroyed before running | Added module-level `_bg_tasks` set to hold strong reference |
+| Full `DELETE` before incremental insert | Re-running scan wiped all existing data for the day | Changed to `DELETE WHERE ticker IN (batch)` |
+| Always scanning first 20 tickers | Repeated scans scanned same stocks over and over | Implemented offset from DB — each run skips already-scanned tickers |
+| `UnboundLocalError: scan_empty` | Hard crash in SSE stream | Moved variable initialization outside `for` loop |
+| SQL date boundary bug (days 28–31) | `get_scan_results` returned empty for late-month dates | Replaced hardcoded day math with `timedelta(days=1)` |
+| `ConnectionDoesNotExistError` (asyncpg) | Scan crashed mid-write after 30–90s of Finnhub API calls | Refactored to use three short-lived sessions: (1) quick read at start, (2) no session held during Finnhub work, (3) fresh write session at end |
 
 

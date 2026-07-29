@@ -60,6 +60,12 @@ export interface NewsItem {
   publishedAt: string;
 }
 
+export interface StockSynthesis {
+  symbol: string;
+  reasons: ReasonItem[];
+  newsSummary: string | null;
+}
+
 export interface StockDetail {
   id?: number;
   symbol: string;
@@ -69,6 +75,7 @@ export interface StockDetail {
   chg: number;
   pct: number;
   score: number;
+  volume?: string;
   hardFlags: string[];
   levels: SupportResistanceLevels;
   layerScores: LayerScoreItem[];

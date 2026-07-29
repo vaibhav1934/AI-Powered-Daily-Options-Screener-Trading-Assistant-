@@ -24,7 +24,7 @@ class F40NoCleanSetup(BaseFactor):
         "Veto — do not force a trade when no factor combination "
         "produces a coherent thesis."
     )
-    layer = 9
+    layer = 8
     status = FactorStatus.LIVE
 
     # Minimum number of live factors that must trigger for a "clean" setup

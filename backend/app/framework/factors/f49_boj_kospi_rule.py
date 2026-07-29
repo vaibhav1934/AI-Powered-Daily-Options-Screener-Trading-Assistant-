@@ -40,7 +40,7 @@ class F49BOJKOSPIRule(BaseFactor):
         "When KOSPI drops -5% or more on the day, avoid semiconductor "
         "call recommendations."
     )
-    layer = 3
+    layer = 10
     status = FactorStatus.LIVE
 
     KOSPI_THRESHOLD = -5.0  # KOSPI percentage drop threshold

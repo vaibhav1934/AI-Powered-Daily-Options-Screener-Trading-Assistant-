@@ -17,16 +17,16 @@ from typing import Any
 
 from app.framework.factors.base import ScanContext
 from app.framework.factors.registry import factor_registry
-from app.framework.layers.layer_01_universe import Layer01Universe
-from app.framework.layers.layer_02_catalyst import Layer02Catalyst
-from app.framework.layers.layer_03_macro import Layer03Macro
-from app.framework.layers.layer_04_gap import Layer04Gap
-from app.framework.layers.layer_05_binary import Layer05Binary
-from app.framework.layers.layer_06_regulatory import Layer06Regulatory
-from app.framework.layers.layer_07_time_gate import Layer07TimeGate
-from app.framework.layers.layer_08_analyst import Layer08Analyst
-from app.framework.layers.layer_09_conviction import Layer09Conviction
-from app.framework.layers.layer_10_ranking import Layer10Ranking
+from app.framework.layers.layer_01_price_action import Layer01PriceAction
+from app.framework.layers.layer_02_volume_flow import Layer02VolumeFlow
+from app.framework.layers.layer_03_volatility import Layer03Volatility
+from app.framework.layers.layer_04_earnings import Layer04Earnings
+from app.framework.layers.layer_05_analyst import Layer05Analyst
+from app.framework.layers.layer_06_macro_rates import Layer06MacroRates
+from app.framework.layers.layer_07_sector_rotation import Layer07SectorRotation
+from app.framework.layers.layer_08_news_catalyst import Layer08NewsCatalyst
+from app.framework.layers.layer_09_risk_rules import Layer09RiskRules
+from app.framework.layers.layer_10_position_fit import Layer10PositionFit
 from app.framework.scoring import assign_list_type, assign_risk_bucket, calculate_conviction_score
 
 logger = logging.getLogger(__name__)
@@ -34,16 +34,16 @@ logger = logging.getLogger(__name__)
 
 # Ordered layer pipeline
 LAYER_PIPELINE = [
-    Layer01Universe(),
-    Layer02Catalyst(),
-    Layer03Macro(),
-    Layer04Gap(),
-    Layer05Binary(),
-    Layer06Regulatory(),
-    Layer07TimeGate(),
-    Layer08Analyst(),
-    Layer09Conviction(),
-    Layer10Ranking(),
+    Layer01PriceAction(),
+    Layer02VolumeFlow(),
+    Layer03Volatility(),
+    Layer04Earnings(),
+    Layer05Analyst(),
+    Layer06MacroRates(),
+    Layer07SectorRotation(),
+    Layer08NewsCatalyst(),
+    Layer09RiskRules(),
+    Layer10PositionFit(),
 ]
 
 
@@ -66,8 +66,8 @@ def run_scan_for_ticker(ctx: ScanContext) -> ScanContext:
             layer.name,
             ctx.ticker,
         )
-        # Calculate score BEFORE Layer 9 (Conviction Scoring) so F40 can use it
-        if layer.layer_number == 9:
+        # Calculate score BEFORE Layer 8 (News/Catalyst) so F40 No Clean Setup can use it
+        if layer.layer_number == 8:
             ctx.conviction_score = calculate_conviction_score(ctx)
             
         ctx = layer.process(ctx)

@@ -15,10 +15,11 @@ interface ScreenerTableProps {
   onSort?: (key: string) => void;
   activeTab?: "all" | "list1" | "list2";
   onTabChange?: (tab: "all" | "list1" | "list2") => void;
-  totalCount?: number;
-  page?: number;
-  totalPages?: number;
+  totalCount: number;
+  page: number;
+  totalPages: number;
   onPageChange?: (page: number) => void;
+  isMobile?: boolean;
 }
 
 export function ScreenerTable({
@@ -32,11 +33,12 @@ export function ScreenerTable({
   activeTab = "all",
   onTabChange,
   totalCount,
-  page = 1,
-  totalPages = 1,
+  page,
+  totalPages,
   onPageChange,
+  isMobile,
 }: ScreenerTableProps) {
-  const displayTotal = totalCount || items.length;
+  const displayTotal = totalCount > 0 ? totalCount : items.length;
   const startItem = displayTotal === 0 ? 0 : (page - 1) * 10 + 1;
   const endItem = Math.min(page * 10, displayTotal);
 
@@ -65,7 +67,7 @@ export function ScreenerTable({
   }
 
   return (
-    <div style={{ flex: 1, padding: "20px 24px", minWidth: 0, minHeight: 0, height: "100%", background: "#fff", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+    <div style={{ flex: 1, padding: "12px 24px", minWidth: 0, minHeight: 0, height: "100%", background: "#fff", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       <div>
         <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
           {tabs.map((t) => (
@@ -73,13 +75,13 @@ export function ScreenerTable({
               key={t.id}
               onClick={() => onTabChange && onTabChange(t.id)}
               style={{
-                padding: "10px 16px",
+                padding: "6px 14px",
                 background: "none",
                 border: "none",
                 borderBottom: activeTab === t.id ? "2px solid #1a73e8" : "2px solid transparent",
                 color: activeTab === t.id ? "#1a73e8" : "#5f6368",
                 fontWeight: 500,
-                fontSize: 14,
+                fontSize: 13,
                 cursor: "pointer",
                 transition: "all 0.15s ease",
               }}
@@ -89,43 +91,66 @@ export function ScreenerTable({
           ))}
         </div>
 
-        <div style={{ fontSize: 12, color: "#5f6368", margin: "6px 0 4px" }}>
-          Showing <span style={{ fontWeight: 600 }}>{startItem}</span> - <span style={{ fontWeight: 600 }}>{endItem}</span> of <span style={{ fontWeight: 600 }}>{displayTotal}</span> stocks matching your filters
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "6px 0 4px" }}>
+          <div style={{ fontSize: 12, color: "#5f6368" }}>
+            Showing <span style={{ fontWeight: 600 }}>{startItem}</span> - <span style={{ fontWeight: 600 }}>{endItem}</span> of <span style={{ fontWeight: 600 }}>{displayTotal}</span> stocks
+          </div>
+          {isMobile && onSort && (
+            <select
+              onChange={(e) => onSort(e.target.value)}
+              style={{
+                fontSize: 12,
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid #e8eaed",
+                background: "#f8f9fa",
+                color: "#202124",
+                outline: "none",
+              }}
+            >
+              <option value="score">Sort: Score</option>
+              <option value="symbol">Sort: Name</option>
+              <option value="price">Sort: Price</option>
+              <option value="pct">Sort: Change %</option>
+            </select>
+          )}
         </div>
 
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #e8eaed" }}>
-              <th style={{ width: 28 }}></th>
-              <th
-                onClick={() => onSort && onSort("symbol")}
-                style={{ textAlign: "left", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
-              >
-                Name
-              </th>
-              <th style={{ textAlign: "left", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>Sector</th>
-              <th style={{ padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>14d</th>
-              <th
-                onClick={() => onSort && onSort("price")}
-                style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
-              >
-                Price
-              </th>
-              <th
-                onClick={() => onSort && onSort("pct")}
-                style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
-              >
-                Change
-              </th>
-              <th style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>Volume</th>
-              <th
-                onClick={() => onSort && onSort("score")}
-                style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
-              >
-                Score
-              </th>
-            </tr>
-          </thead>
+          {!isMobile && (
+            <thead>
+              <tr style={{ borderBottom: "1px solid #e8eaed" }}>
+                <th style={{ width: 28 }}></th>
+                <th
+                  onClick={() => onSort && onSort("symbol")}
+                  style={{ textAlign: "left", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
+                >
+                  Name
+                </th>
+                <th style={{ textAlign: "left", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>Sector</th>
+                <th style={{ padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>14d</th>
+                <th
+                  onClick={() => onSort && onSort("price")}
+                  style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
+                >
+                  Price
+                </th>
+                <th
+                  onClick={() => onSort && onSort("pct")}
+                  style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
+                >
+                  Change
+                </th>
+                <th style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>Volume</th>
+                <th
+                  onClick={() => onSort && onSort("score")}
+                  style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500, cursor: "pointer" }}
+                >
+                  Score
+                </th>
+              </tr>
+            </thead>
+          )}
           <tbody>
             {items.map((item) => (
               <ScreenerRow
@@ -135,6 +160,7 @@ export function ScreenerTable({
                 onToggleWatch={onToggleWatch}
                 onSelect={onSelect}
                 selected={selectedSymbol === item.symbol}
+                isMobile={isMobile}
               />
             ))}
             {items.length === 0 && (

@@ -24,7 +24,7 @@ class F45FOMCReduction(BaseFactor):
         "On FOMC days, reduce position sizing by 50% and hard-lock "
         "new entries at 12:45 PM CST."
     )
-    layer = 7
+    layer = 9
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:

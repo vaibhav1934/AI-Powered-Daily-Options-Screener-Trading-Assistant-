@@ -24,7 +24,7 @@ class F44AnalystTierWeighting(BaseFactor):
         "When an analyst rating change occurs, weight the conviction "
         "adjustment by the tier/reputation of the issuing firm."
     )
-    layer = 8
+    layer = 9
     status = FactorStatus.LIVE
 
     # Conviction adjustments by analyst tier

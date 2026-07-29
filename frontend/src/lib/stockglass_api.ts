@@ -5,6 +5,7 @@ import {
   IndexItem,
   StockListResponse,
   StockDetail,
+  StockSynthesis,
   FullFactorBreakdown,
 } from "@/types/stockglass";
 
@@ -79,6 +80,22 @@ export async function fetchStockDetail(symbol: string): Promise<StockDetail> {
   }
   const data = await res.json();
   console.log("[FLOW: Frontend API] <── fetchStockDetail: Received detail for", data.symbol, "with score", data.score);
+  return data;
+}
+
+export async function fetchStockSynthesis(symbol: string): Promise<StockSynthesis> {
+  const targetUrl = `${API_BASE_URL}/stocks/${encodeURIComponent(symbol)}/synthesis`;
+  console.log("[FLOW: Frontend API] ──> fetchStockSynthesis: Requesting GET", targetUrl);
+  const res = await fetch(targetUrl, {
+    headers: DEFAULT_HEADERS,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    console.error("[FLOW: Frontend API] <── fetchStockSynthesis FAILED HTTP", res.status);
+    throw new Error(`Failed to fetch synthesis for ${symbol} (HTTP ${res.status})`);
+  }
+  const data = await res.json();
+  console.log("[FLOW: Frontend API] <── fetchStockSynthesis: Received synthesis for", data.symbol);
   return data;
 }
 

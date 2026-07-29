@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { StockDetail } from "@/types/stockglass";
+import { StockDetail, StockSynthesis } from "@/types/stockglass";
+import { fetchStockSynthesis } from "@/lib/stockglass_api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { scoreColor } from "./ScreenerRow";
 import { ExternalLink, Info, Newspaper, Sparkles, Upload, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
@@ -12,6 +13,7 @@ interface DetailPanelProps {
   symbol: string;
   detail: StockDetail | null;
   loading: boolean;
+  error?: string | null;
   onOpenFactors: () => void;
   onAskAi?: (prompt: string) => void;
 }
@@ -20,6 +22,7 @@ export function DetailPanel({
   symbol,
   detail,
   loading,
+  error,
   onOpenFactors,
   onAskAi,
 }: DetailPanelProps) {
@@ -27,12 +30,35 @@ export function DetailPanel({
   const [localStrike, setLocalStrike] = useState<number | null>(null);
   const [aiSelection, setAiSelection] = useState<any>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [synthesis, setSynthesis] = useState<StockSynthesis | null>(null);
+  const [loadingSynthesis, setLoadingSynthesis] = useState(false);
 
   useEffect(() => {
     if (detail) {
       setLocalStrike(detail.execution_details?.strike_price ?? null);
       setAiSelection(null);
       setUploadError(null);
+      setSynthesis(null);
+      setLoadingSynthesis(true);
+
+      let isMounted = true;
+      fetchStockSynthesis(detail.symbol)
+        .then((data) => {
+          if (isMounted) {
+            setSynthesis(data);
+            setLoadingSynthesis(false);
+          }
+        })
+        .catch((err) => {
+          if (isMounted) {
+            console.error("Failed to fetch synthesis:", err);
+            setLoadingSynthesis(false);
+          }
+        });
+
+      return () => {
+        isMounted = false;
+      };
     }
   }, [detail]);
 
@@ -68,6 +94,16 @@ export function DetailPanel({
     );
   }
 
+  if (error) {
+    return (
+      <div style={{ borderLeft: "1px solid #e8eaed", padding: 40, width: "100%", flexShrink: 0, background: "#fff", textAlign: "center", color: "#c5221f" }}>
+        <AlertCircle size={32} style={{ margin: "0 auto", marginBottom: 12 }} />
+        <p style={{ fontSize: 16, fontWeight: 500 }}>Detail Not Available</p>
+        <p style={{ fontSize: 13, marginTop: 8 }}>{error}</p>
+      </div>
+    );
+  }
+
   if (loading || !detail) {
     return (
       <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff" }}>
@@ -87,12 +123,13 @@ export function DetailPanel({
   const support = detail.levels?.support ?? 0;
   const resistance = detail.levels?.resistance ?? 0;
 
-  const layerData = detail.layerScores && detail.layerScores.length > 0
-    ? detail.layerScores.map((l) => ({
-        layer: l.layer ? String(l.layer).split("/")[0].split(" ")[0] : "?",
-        val: l.value ?? 0,
-      }))
-    : [];
+  const layerData = detail.layerScores?.map((l: any) => ({
+    layer: l.layer ? String(l.layer).split("/")[0].split(" ")[0] : "?",
+    val: l.value ?? 0,
+  })) || [];
+
+  const reasons = synthesis?.reasons || detail.reasons || [];
+  const newsSummary = synthesis?.newsSummary || detail.newsSummary || null;
 
   return (
     <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff", overflowY: "auto", height: "100%" }}>
@@ -110,8 +147,9 @@ export function DetailPanel({
         ${detail.price.toFixed(2)}
       </div>
 
-      <div style={{ fontSize: 13, color: isPos ? "#188038" : "#c5221f", marginBottom: 12 }}>
-        {isPos ? "+" : ""}{detail.chg.toFixed(2)} ({detail.pct.toFixed(2)}%)
+      <div style={{ fontSize: 13, color: isPos ? "#188038" : "#c5221f", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+        <span>{isPos ? "+" : ""}{detail.chg.toFixed(2)} ({detail.pct.toFixed(2)}%)</span>
+        {detail.volume && <span style={{ color: "#5f6368", background: "#f1f3f4", padding: "2px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>Vol: {detail.volume}</span>}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5f6368", background: "#f8f9fa", borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
@@ -262,8 +300,13 @@ export function DetailPanel({
           </button>
         )}
       </div>
-      {detail.reasons && detail.reasons.length > 0 ? (
-        detail.reasons.map((r: any, i: number) => {
+      
+      {loadingSynthesis ? (
+        <div style={{ padding: "12px 0", display: "flex", alignItems: "center", gap: 8, color: "#1a73e8", fontSize: 13, fontWeight: 500 }}>
+          <Loader2 size={16} className="animate-spin" /> AI Analyzing Setup...
+        </div>
+      ) : reasons.length > 0 ? (
+        reasons.map((r: any, i: number) => {
           const text = typeof r === "string" ? r : r.text;
           const type = typeof r === "object" && r.type ? r.type : "neutral";
           const code = typeof r === "object" && r.factor ? r.factor : (r as any).code || (type === "bear" ? "F41" : "F44");
@@ -296,7 +339,11 @@ export function DetailPanel({
       <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", margin: "14px 0 8px", display: "flex", alignItems: "center", gap: 6 }}>
         <Newspaper size={13} /> News feeding this score
       </div>
-      {detail.newsSummary ? (
+      {loadingSynthesis ? (
+        <div style={{ padding: "12px 12px", backgroundColor: "#f8fafd", border: "1px solid #e8f0fe", borderRadius: 8, marginBottom: 12, display: "flex", gap: 8, alignItems: "center", color: "#1a73e8", fontSize: 12 }}>
+          <Loader2 size={15} className="animate-spin" /> Synthesizing catalysts...
+        </div>
+      ) : newsSummary ? (
         <div style={{
           padding: "10px 12px",
           backgroundColor: "#f8fafd",
@@ -313,7 +360,7 @@ export function DetailPanel({
               AI Catalyst Synthesis
             </div>
             <div style={{ fontSize: 12.5, color: "#3c4043", lineHeight: 1.4 }}>
-              {detail.newsSummary}
+              {newsSummary}
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ class F43ATHRecordEarnings(BaseFactor):
         "When a stock is at an all-time high with beat-and-raise earnings, "
         "block put recommendations."
     )
-    layer = 5
+    layer = 9
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:

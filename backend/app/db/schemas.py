@@ -350,13 +350,20 @@ class StockDetailSchema(BaseModel):
     chg: float
     pct: float
     score: float
+    volume: Optional[str] = None
     hardFlags: list[str]
     levels: SupportResistanceLevels
     layerScores: list[LayerScoreItem]
-    reasons: list[ReasonItem]
-    news: list[NewsItemSchema]
+    reasons: list[ReasonItem] = []
+    news: list[NewsItemSchema] = []
     newsSummary: Optional[str] = None
     execution_details: Optional[dict[str, Any]] = None
+
+
+class StockSynthesisSchema(BaseModel):
+    symbol: str
+    reasons: list[ReasonItem]
+    newsSummary: Optional[str] = None
 
 
 class FactorBreakdownItem(BaseModel):

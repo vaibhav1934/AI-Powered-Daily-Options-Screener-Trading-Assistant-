@@ -24,7 +24,7 @@ class F47PreEarningsBinaryExit(BaseFactor):
         "When earnings are within the holding window, exit before "
         "the binary event. No holding through earnings."
     )
-    layer = 5
+    layer = 10
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:
