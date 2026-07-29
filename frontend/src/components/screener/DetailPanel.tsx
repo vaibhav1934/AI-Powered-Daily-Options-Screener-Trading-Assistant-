@@ -106,14 +106,12 @@ export function DetailPanel({
 
   if (loading || !detail) {
     return (
-      <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div className="h-6 w-24 bg-slate-100 rounded animate-pulse" />
-          <div className="h-6 w-12 bg-slate-100 rounded animate-pulse" />
-        </div>
-        <div className="h-8 w-32 bg-slate-100 rounded animate-pulse mt-4" />
-        <div className="h-20 w-full bg-slate-100 rounded animate-pulse mt-6" />
-        <div className="h-32 w-full bg-slate-100 rounded animate-pulse mt-6" />
+      <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" }}>
+        <Loader2 size={36} className="animate-spin" style={{ color: "#1a73e8", marginBottom: 16 }} />
+        <p style={{ fontSize: 18, fontWeight: 600, color: "#202124" }}>Analyzing Setup...</p>
+        <p style={{ fontSize: 14, color: "#5f6368", textAlign: "center", marginTop: 8, maxWidth: 280, lineHeight: 1.5 }}>
+          This may take a moment while StockGlass AI synthesizes live news, options flow, and factor data.
+        </p>
       </div>
     );
   }

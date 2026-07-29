@@ -125,7 +125,11 @@ export function QuickFilters({
             ref={popupRef}
             style={{
               ...getPopupStyle(),
-              width: 400,
+              width: "90vw",
+              maxWidth: 400,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
               background: "#fff",
               borderRadius: 20,
               boxShadow:
@@ -148,8 +152,9 @@ export function QuickFilters({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "14px 16px 10px",
-                borderBottom: "1px solid #f1f3f4",
+                padding: "16px 20px",
+                borderBottom: "1px solid #e8eaed",
+                flexShrink: 0,
               }}
             >
               <div
@@ -444,9 +449,13 @@ export function QuickFilters({
           display: "flex",
           alignItems: "center",
           gap: 8,
-          flexWrap: "wrap",
+          flexWrap: "nowrap",
+          overflowX: "auto",
+          msOverflowStyle: "none",
+          scrollbarWidth: "none",
         }}
       >
+        <style>{`div::-webkit-scrollbar { display: none; }`}</style>
         {/* Filter button (anchors the popup) */}
         <button
           ref={filterBtnRef}
@@ -495,6 +504,8 @@ export function QuickFilters({
             gap: 4,
             fontSize: 12,
             color: "#80868b",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           <Sparkles size={12} /> Try:
@@ -514,6 +525,8 @@ export function QuickFilters({
               background: activeQuick === qf.id ? "#e8f0fe" : "#fff",
               color: activeQuick === qf.id ? "#1a73e8" : "#3c4043",
               fontWeight: 500,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "all 0.15s ease",
             }}
           >
@@ -537,6 +550,8 @@ export function QuickFilters({
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
             >
               {RISK_BUCKETS.find((r) => r.id === riskBucket)?.label}
@@ -571,6 +586,8 @@ export function QuickFilters({
               display: "flex",
               alignItems: "center",
               gap: 5,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {activeSector}
