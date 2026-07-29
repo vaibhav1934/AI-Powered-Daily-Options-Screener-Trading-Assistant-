@@ -8,7 +8,10 @@ Uses Postgres-backed cache + rate limiter from core/.
 
 from __future__ import annotations
 
+from decimal import Decimal
 import logging
+import asyncio
+import yfinance as yf
 from datetime import date
 from typing import Any, Optional
 
@@ -98,19 +101,27 @@ class FinnhubClient:
         return data
 
     async def get_quote(self, ticker: str, session: Any = None) -> QuoteData:
-        """Get current quote for a ticker."""
+        """Get current quote for a ticker. Fetches price from finnhub, volume from yfinance."""
         data = await self._request("/quote", {"symbol": ticker}, session)
+        
+        # Free Finnhub /quote does not return volume, fetch from yfinance in thread
+        try:
+            volume = await asyncio.to_thread(lambda t: int(yf.Ticker(t).fast_info.last_volume or 0), ticker)
+        except Exception as e:
+            logger.warning(f"Failed to fetch volume for {ticker} from yfinance: {e}")
+            volume = int(data.get("v") or 0)
+
         return QuoteData(
             ticker=ticker,
-            current_price=data.get("c", 0.0),
-            open_price=data.get("o", 0.0),
-            high_price=data.get("h", 0.0),
-            low_price=data.get("l", 0.0),
-            previous_close=data.get("pc", 0.0),
-            volume=int(data.get("v", 0)),
-            change=data.get("d", 0.0),
-            change_percent=data.get("dp", 0.0),
-            timestamp=str(data.get("t", "")),
+            current_price=float(data.get("c") or 0.0),
+            open_price=float(data.get("o") or 0.0),
+            high_price=float(data.get("h") or 0.0),
+            low_price=float(data.get("l") or 0.0),
+            previous_close=float(data.get("pc") or 0.0),
+            volume=volume,
+            change=float(data.get("d") or 0.0),
+            change_percent=float(data.get("dp") or 0.0),
+            timestamp=str(data.get("t") or ""),
             is_estimate=True,  # NFR-3: always estimate unless screenshot-confirmed
         )
 

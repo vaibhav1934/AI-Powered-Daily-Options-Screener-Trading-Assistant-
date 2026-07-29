@@ -24,7 +24,7 @@ class F46EDGARShelfCheck(BaseFactor):
         "When a ticker is near ATH proximity, mandatory SEC EDGAR "
         "shelf/dilution filing check before entry."
     )
-    layer = 6
+    layer = 10
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:

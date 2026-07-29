@@ -31,6 +31,7 @@ from app.db.schemas import (
     PositionItemSchema,
     PositionListResponseSchema,
     StockDetailSchema,
+    StockSynthesisSchema,
     StockListResponseSchema,
 )
 from app.db.session import get_db
@@ -122,6 +123,17 @@ async def get_stock_detail(
 ):
     """Get detailed stock view including 10-layer scores, reasons, and news."""
     return await stockglass_service.get_stock_detail(session, symbol)
+
+
+@router.get("/stocks/{symbol}/synthesis", response_model=StockSynthesisSchema)
+async def get_stock_synthesis(
+    symbol: str,
+    session: AsyncSession = Depends(get_db),
+    _token: str = Depends(verify_token_scope("read:screener")),
+):
+    """Get AI synthesis (bull/bear reasons and news summary) for a given stock."""
+    from app.services import stockglass_service
+    return await stockglass_service.get_stock_synthesis(session, symbol)
 
 
 # --- Section 4: Full 50-factor breakdown modal ---

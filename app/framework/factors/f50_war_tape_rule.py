@@ -44,7 +44,7 @@ class F50WarTapeRule(BaseFactor):
         "When ceasefire or de-escalation headlines appear, "
         "energy call setups are treated as dead."
     )
-    layer = 3
+    layer = 10
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:

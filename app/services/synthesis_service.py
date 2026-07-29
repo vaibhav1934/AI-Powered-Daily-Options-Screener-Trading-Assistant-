@@ -48,6 +48,11 @@ def check_compliance(text: str) -> bool:
     return True
 
 
+import time
+
+_reasons_cache = {}
+_news_cache = {}
+
 async def synthesize_reasons(
     symbol: str,
     score: float,
@@ -65,6 +70,12 @@ async def synthesize_reasons(
     active_factors = [f for f in factor_logs if f.triggered or f.vetoed]
     if not active_factors:
         return []
+        
+    now = time.time()
+    if symbol in _reasons_cache:
+        expiry, cached_reasons = _reasons_cache[symbol]
+        if now < expiry:
+            return cached_reasons
 
     system_prompt = (
         "You are the StockGlass AI Synthesis Agent. Your role is to synthesize deterministic "
@@ -125,6 +136,8 @@ async def synthesize_reasons(
                             text=f"Factor {item['code']} active: structure evaluation recorded (AI text filtered by compliance).",
                         )
                     )
+        
+        _reasons_cache[symbol] = (now + 3600, reasons)
         return reasons
     except Exception as e:
         logger.info("AI Synthesis call bypassed or offline (%s). Using deterministic factor descriptions without mock data.", e)

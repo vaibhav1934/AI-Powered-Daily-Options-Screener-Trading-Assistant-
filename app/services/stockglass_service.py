@@ -30,6 +30,7 @@ from app.db.schemas import (
     NewsItemSchema,
     ReasonItem,
     StockDetailSchema,
+    StockSynthesisSchema,
     StockListItemSchema,
     StockListResponseSchema,
     SupportResistanceLevels,
@@ -353,13 +354,16 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
     chg = 0.0
     pct = 0.0
     news_items = []
-    quote = None
+    volume_str = mdata.get("volume") if isinstance(mdata.get("volume"), str) else "N/A"
     try:
         quote = await client.get_quote(symbol, session=session)
         if quote and quote.current_price > 0:
             price = quote.current_price
             chg = quote.change
             pct = quote.change_percent
+            if quote.volume and quote.volume > 0:
+                vol = quote.volume
+                volume_str = f"{vol / 1_000_000:.1f}M" if vol >= 1_000_000 else f"{vol / 1_000:.1f}K" if vol >= 1_000 else str(vol)
             
         if not real_sector or real_sector in ("Unknown", "US Equities"):
             profile = await client.get_company_profile(symbol, session=session)
@@ -427,24 +431,10 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
         layer_scores.append(LayerScoreItem(layer=lname, value=val))
         
     # Generate bull / bear reasons and news summary via AI Synthesis Agent (with compliance filter and zero-mock fallback)
+    # Moved to separate API endpoint /synthesis for performance
     reasons: list[ReasonItem] = []
     news_summary: Optional[str] = None
-    if scan and scan.factor_logs:
-        reasons, news_summary = await asyncio.gather(
-            synthesize_reasons(
-                symbol=symbol,
-                score=score,
-                factor_logs=list(scan.factor_logs),
-                news=news_items,
-            ),
-            synthesize_news_summary(
-                symbol=symbol,
-                news=news_items,
-            ),
-        )
-    elif news_items:
-        news_summary = await synthesize_news_summary(symbol=symbol, news=news_items)
-        
+
     if scan and scan.strike_price is None and scan.entry_price is not None:
         is_bullish = True
         if scan.veto_rule in ("F43", "F49"):
@@ -467,6 +457,7 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
         chg=round(chg, 2),
         pct=round(pct, 2),
         score=score,
+        volume=volume_str,
         hardFlags=hard_flags,
         levels=levels,
         layerScores=layer_scores,
@@ -663,3 +654,60 @@ async def get_stock_live_evaluation(session: AsyncSession, symbol: str) -> Stock
     # Return updated detail view
     return await get_stock_detail(session, symbol)
 
+
+async def get_stock_synthesis(session: AsyncSession, symbol: str) -> StockSynthesisSchema:
+    symbol = symbol.upper()
+    client = FinnhubClient()
+    news_items = []
+    try:
+        raw_news = await client.get_news(ticker=symbol, session=session)
+        for n in raw_news[:5]:
+            news_items.append(
+                NewsItemSchema(
+                    headline=n.headline,
+                    source=n.source or "Market News",
+                    publishedAt=n.published_at or datetime.now(timezone.utc).isoformat(),
+                    url=n.url or "#",
+                    summary=getattr(n, "summary", ""),
+                )
+            )
+    except Exception as e:
+        logger.warning("Failed to fetch Finnhub news for %s synthesis: %s", symbol, e)
+    finally:
+        await client.close()
+        
+    stmt = (
+        select(DailyScan)
+        .options(selectinload(DailyScan.factor_logs))
+        .where(DailyScan.ticker == symbol)
+        .order_by(DailyScan.id.desc())
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    scan = result.scalar_one_or_none()
+    
+    reasons: list[ReasonItem] = []
+    news_summary: Optional[str] = None
+    score = round(scan.score, 1) if scan else 0.0
+
+    if scan and scan.factor_logs:
+        reasons, news_summary = await asyncio.gather(
+            synthesize_reasons(
+                symbol=symbol,
+                score=score,
+                factor_logs=list(scan.factor_logs),
+                news=news_items,
+            ),
+            synthesize_news_summary(
+                symbol=symbol,
+                news=news_items,
+            ),
+        )
+    elif news_items:
+        news_summary = await synthesize_news_summary(symbol=symbol, news=news_items)
+
+    return StockSynthesisSchema(
+        symbol=symbol,
+        reasons=reasons,
+        newsSummary=news_summary
+    )

@@ -24,7 +24,7 @@ class F42EntryCutoff(BaseFactor):
         "Lock new entries at 11:00 AM CST (10:30 AM on Fridays). "
         "Server-authoritative time check — never client-side."
     )
-    layer = 7
+    layer = 9
     status = FactorStatus.LIVE
 
     def evaluate(self, ctx: ScanContext) -> FactorResult:
