@@ -20,8 +20,10 @@ from sqlalchemy.orm import selectinload
 from app.core.time_gate import get_cst_now, get_cutoff_status, is_fomc_day, is_friday, is_past_cutoff
 from app.db.models import AuditAction, AuditLog, DailyScan, FactorLog, ListType, RiskBucket, ScanStatus
 from app.framework.engine import run_full_scan
+from app.framework.dual_horizon import evaluate_dual_horizon
 from app.framework.factors.registry import factor_registry
 from app.core.market_data.technicals import fetch_technicals
+from app.services.fundamentals_service import get_fundamentals
 from app.services.options_service import get_automated_option_contract
 
 logger = logging.getLogger(__name__)
@@ -142,6 +144,7 @@ async def trigger_scan(
                         quote = await client.get_quote(entry.ticker, session=task_session)
                         gap = quote.change_percent
                         tech_data = await fetch_technicals(entry.ticker, quote.current_price, task_session)
+                        fundamentals = await get_fundamentals(entry.ticker)
                         profile = await client.get_company_profile(entry.ticker, session=task_session)
                         
                         # Format volume as readable string
@@ -165,6 +168,16 @@ async def trigger_scan(
                             "sector": profile.get("sector") or "Unknown",
                             "change": quote.change,
                             "volume_str": vol_str,
+                            "revenue_growth": fundamentals.get("revenue_growth"),
+                            "gross_margin": fundamentals.get("gross_margin"),
+                            "operating_margin": fundamentals.get("operating_margin"),
+                            "free_cash_flow": fundamentals.get("free_cash_flow"),
+                            "debt_to_equity": fundamentals.get("debt_to_equity"),
+                            "interest_coverage": fundamentals.get("interest_coverage"),
+                            "insider_ownership": fundamentals.get("insider_ownership"),
+                            "trailing_pe": fundamentals.get("trailing_pe"),
+                            "forward_pe": fundamentals.get("forward_pe"),
+                            "peg_ratio": fundamentals.get("peg_ratio"),
                         }
                     except Exception as e:
                         logger.warning("Skipping %s due to error: %s", entry.ticker, e)
@@ -225,7 +238,6 @@ async def trigger_scan(
         for ctx in scan_results:
             # Map risk bucket
             risk_bucket = _map_risk_bucket(ctx)
-            list_type = _map_list_type(ctx)
 
             # Calculate target execution zones based on technicals and conviction
             entry_target = ctx.current_price if ctx.current_price > 0 else None
@@ -250,16 +262,23 @@ async def trigger_scan(
                 else:
                     stop_target = round(ctx.sma_50 * 1.02, 2) if ctx.sma_50 else None
 
+            dual_horizon = evaluate_dual_horizon(ctx, option_contract_res)
+            resolved_list_type = _map_dual_list_type(dual_horizon)
+            persisted_score = dual_horizon.get("tactical", {}).get("score")
+            if not isinstance(persisted_score, (int, float)):
+                persisted_score = ctx.conviction_score
+
             scan_entry = DailyScan(
                 scan_date=datetime.combine(scan_date, datetime.min.time(), tzinfo=timezone.utc),
                 ticker=ctx.ticker,
-                score=ctx.conviction_score,
+                score=float(persisted_score),
                 risk_bucket=risk_bucket,
                 status=ScanStatus.LOCKED if ctx.is_vetoed or macro_context["is_past_cutoff"] else ScanStatus.CONFIRMED,
-                list_type=list_type,
+                list_type=resolved_list_type,
                 factor_results_json={
                     "results": [r.model_dump() for r in ctx.factor_results],
                     "coverage": factor_registry.coverage_report(),
+                    "dual_horizon": dual_horizon,
                     "market_data": {
                         "price": ctx.current_price,
                         "gap": ctx.change_percent,
@@ -361,6 +380,29 @@ def _map_list_type(ctx: Any) -> Optional[ListType]:
     return ListType.LIST_1 if lt == "LIST_1" else ListType.LIST_2
 
 
+def _map_dual_list_type(dual_horizon: dict[str, Any]) -> Optional[ListType]:
+    """Map dual-horizon evaluations to legacy LIST_1/LIST_2 storage column."""
+    tactical = dual_horizon.get("tactical", {}) if isinstance(dual_horizon, dict) else {}
+    long_term = dual_horizon.get("long_term", {}) if isinstance(dual_horizon, dict) else {}
+
+    tactical_ok = (
+        bool(tactical.get("regime_gate_pass"))
+        and isinstance(tactical.get("score"), (int, float))
+        and float(tactical.get("score")) >= 5.0
+    )
+    long_term_ok = (
+        long_term.get("status") == "SCORED"
+        and isinstance(long_term.get("score"), (int, float))
+        and float(long_term.get("score")) >= 6.0
+    )
+
+    if tactical_ok:
+        return ListType.LIST_1
+    if long_term_ok:
+        return ListType.LIST_2
+    return None
+
+
 async def evaluate_and_persist_on_demand(
     session: AsyncSession,
     symbol: str,
@@ -375,6 +417,7 @@ async def evaluate_and_persist_on_demand(
     try:
         from app.core.market_data.technicals import fetch_technicals
         tech_data = await fetch_technicals(symbol, quote.current_price if quote else 0.0, session)
+        fundamentals = await get_fundamentals(symbol)
         vol = quote.volume if quote else 0
         vol_str = f"{vol / 1_000_000:.1f}M" if vol >= 1_000_000 else f"{vol / 1_000:.1f}K" if vol >= 1_000 else str(vol)
         
@@ -395,6 +438,16 @@ async def evaluate_and_persist_on_demand(
             "sector": sector or "Unknown",
             "change": quote.change if quote else 0.0,
             "volume_str": vol_str,
+            "revenue_growth": fundamentals.get("revenue_growth"),
+            "gross_margin": fundamentals.get("gross_margin"),
+            "operating_margin": fundamentals.get("operating_margin"),
+            "free_cash_flow": fundamentals.get("free_cash_flow"),
+            "debt_to_equity": fundamentals.get("debt_to_equity"),
+            "interest_coverage": fundamentals.get("interest_coverage"),
+            "insider_ownership": fundamentals.get("insider_ownership"),
+            "trailing_pe": fundamentals.get("trailing_pe"),
+            "forward_pe": fundamentals.get("forward_pe"),
+            "peg_ratio": fundamentals.get("peg_ratio"),
         }
         
         from app.framework.engine import run_full_scan
@@ -405,7 +458,6 @@ async def evaluate_and_persist_on_demand(
         ctx = scan_results[0]
         
         risk_bucket = _map_risk_bucket(ctx)
-        list_type = _map_list_type(ctx)
         
         entry_target = ctx.current_price if ctx.current_price > 0 else None
         strike_target = None
@@ -423,6 +475,12 @@ async def evaluate_and_persist_on_demand(
                 stop_target = round(ctx.sma_50 * 0.98, 2) if ctx.sma_50 else None
             else:
                 stop_target = round(ctx.sma_50 * 1.02, 2) if ctx.sma_50 else None
+
+        dual_horizon = evaluate_dual_horizon(ctx, option_contract_res)
+        resolved_list_type = _map_dual_list_type(dual_horizon)
+        persisted_score = dual_horizon.get("tactical", {}).get("score")
+        if not isinstance(persisted_score, (int, float)):
+            persisted_score = ctx.conviction_score
                 
         today_dt = datetime.combine(date.today(), datetime.min.time(), tzinfo=timezone.utc)
         await session.execute(
@@ -433,13 +491,14 @@ async def evaluate_and_persist_on_demand(
         scan_entry = DailyScan(
             scan_date=today_dt,
             ticker=ctx.ticker,
-            score=ctx.conviction_score,
+            score=float(persisted_score),
             risk_bucket=risk_bucket,
             status=ScanStatus.LOCKED if ctx.is_vetoed else ScanStatus.CONFIRMED,
-            list_type=list_type,
+            list_type=resolved_list_type,
             factor_results_json={
                 "results": [r.model_dump() for r in ctx.factor_results],
                 "coverage": factor_registry.coverage_report(),
+                "dual_horizon": dual_horizon,
                 "market_data": {
                     "price": ctx.current_price,
                     "gap": ctx.change_percent,

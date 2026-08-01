@@ -200,7 +200,7 @@ def create_app() -> FastAPI:
             },
         )
 
-    # Register routes (both under /v1 and at root fallback)
+    # Register versioned API routes
     app.include_router(api_router)
     app.include_router(root_api_router)
 

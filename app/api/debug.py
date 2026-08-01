@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/debug", tags=["debug"])
 
 class TickerScanRequest(BaseModel):
-    ticker: str
+    ticker: str = "NVDA"
     scan_date: Optional[date] = None
 
 @router.post("/scan-ticker")
@@ -70,18 +70,34 @@ async def debug_scan_ticker(
         await client.close()
 
     # Run engine on this single ticker
-    results = run_full_scan([ticker_data], macro_context)
+    results = run_full_scan([ticker_data], macro_context, scan_date=scan_date)
     if not results:
         return {"error": "Ticker failed evaluation entirely (e.g. F01 Universe Filter dropped it)."}
         
     ctx = results[0]
     return {
         "ticker": ctx.ticker,
-        "status": ctx.status,
+        "scan_date": ctx.scan_date,
         "conviction_score": ctx.conviction_score,
-        "factors_triggered": [f.factor_id for f in ctx.factors_triggered],
-        "factors_failed": [f.factor_id for f in ctx.factors_failed],
-        "veto_rules": ctx.veto_rules_applied
+        "is_vetoed": ctx.is_vetoed,
+        "veto_rule": ctx.veto_rule,
+        "veto_reason": ctx.veto_reason,
+        "factors_triggered": ctx.triggered_factors,
+        "triggered_count": len([r for r in ctx.factor_results if r.triggered]),
+        "vetoed_count": len([r for r in ctx.factor_results if r.vetoed]),
+        "live_factor_count": len([r for r in ctx.factor_results if not r.stubbed]),
+        "stubbed_factor_count": len([r for r in ctx.factor_results if r.stubbed]),
+        "triggered_details": [
+            {
+                "factor_id": r.factor_id,
+                "factor_name": r.factor_name,
+                "action": r.action.value if hasattr(r.action, "value") else str(r.action),
+                "vetoed": r.vetoed,
+                "detail": r.detail,
+            }
+            for r in ctx.factor_results
+            if r.triggered or r.vetoed
+        ],
     }
 
 @router.get("/finnhub/quote/{ticker}")

@@ -106,6 +106,18 @@ class ScanContext:
     analyst_rating_change: bool = False
     analyst_firm_tier: Optional[int] = None  # 1=top tier, 3=low tier
 
+    # Fundamentals (long-term engine inputs)
+    revenue_growth: Optional[float] = None
+    gross_margin: Optional[float] = None
+    operating_margin: Optional[float] = None
+    free_cash_flow: Optional[float] = None
+    debt_to_equity: Optional[float] = None
+    interest_coverage: Optional[float] = None
+    insider_ownership: Optional[float] = None
+    trailing_pe: Optional[float] = None
+    forward_pe: Optional[float] = None
+    peg_ratio: Optional[float] = None
+
     # SEC filings
     has_recent_shelf_filing: bool = False
     near_ath_proximity: bool = False

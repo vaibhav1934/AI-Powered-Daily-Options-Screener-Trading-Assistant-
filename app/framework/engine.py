@@ -208,6 +208,17 @@ def _build_scan_context(
         # Analyst
         analyst_rating_change=ticker_data.get("analyst_rating_change", False),
         analyst_firm_tier=ticker_data.get("analyst_firm_tier"),
+        # Fundamentals
+        revenue_growth=ticker_data.get("revenue_growth"),
+        gross_margin=ticker_data.get("gross_margin"),
+        operating_margin=ticker_data.get("operating_margin"),
+        free_cash_flow=ticker_data.get("free_cash_flow"),
+        debt_to_equity=ticker_data.get("debt_to_equity"),
+        interest_coverage=ticker_data.get("interest_coverage"),
+        insider_ownership=ticker_data.get("insider_ownership"),
+        trailing_pe=ticker_data.get("trailing_pe"),
+        forward_pe=ticker_data.get("forward_pe"),
+        peg_ratio=ticker_data.get("peg_ratio"),
         # SEC
         has_recent_shelf_filing=ticker_data.get("has_recent_shelf_filing", False),
         near_ath_proximity=ticker_data.get("near_ath_proximity", False),

@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import PositionNotFoundError, StockGlassAuthError
 from app.db.schemas import (
+    DualHorizonListResponseSchema,
     FullFactorBreakdownSchema,
     IndexItemSchema,
     PositionCreateSchema,
@@ -110,6 +111,15 @@ async def get_stock_list(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/stocks/dual-horizon", response_model=DualHorizonListResponseSchema)
+async def get_dual_horizon_lists(
+    session: AsyncSession = Depends(get_db),
+    _token: str = Depends(verify_token_scope("read:screener")),
+):
+    """Get independent 30-day tactical and long-term candidate lists from latest scan."""
+    return await stockglass_service.get_dual_horizon_lists(session)
 
 
 # --- Section 3: Right-hand stock detail view ---
