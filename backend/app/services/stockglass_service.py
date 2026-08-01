@@ -21,12 +21,16 @@ from app.core.market_data.finnhub import FinnhubClient
 from app.core.market_data.edgar import EdgarClient
 from app.db.models import DailyScan, FactorLog, ListType, RiskBucket, ScanStatus, StockUniverse
 from app.db.schemas import (
+    DualFrameworkSchema,
+    DualHorizonListResponseSchema,
     FactorBreakdownItem,
     FactorSummarySchema,
+    FrameworkCandidateSchema,
     FullFactorBreakdownSchema,
     IndexItemSchema,
     LayerBreakdownItem,
     LayerScoreItem,
+    LongTermFrameworkSchema,
     NewsItemSchema,
     ReasonItem,
     StockDetailSchema,
@@ -34,6 +38,7 @@ from app.db.schemas import (
     StockListItemSchema,
     StockListResponseSchema,
     SupportResistanceLevels,
+    TacticalFrameworkSchema,
 )
 from app.framework.factors.base import ScanContext
 from app.framework.factors.f46_edgar_shelf_check import F46EDGARShelfCheck
@@ -204,6 +209,14 @@ async def get_stock_list(
             for f_res in scan.factor_results_json.get("results", []):
                 if f_res.get("vetoed") and f_res.get("factor_id") and f_res.get("factor_id") not in hard_flags:
                     hard_flags.append(f_res.get("factor_id"))
+
+        dual = (scan.factor_results_json or {}).get("dual_horizon", {}) if scan.factor_results_json else {}
+        tactical = dual.get("tactical", {}) if isinstance(dual, dict) else {}
+        long_term = dual.get("long_term", {}) if isinstance(dual, dict) else {}
+        tactical_score = tactical.get("score") if isinstance(tactical.get("score"), (int, float)) else None
+        long_term_score = long_term.get("score") if isinstance(long_term.get("score"), (int, float)) else None
+        regime_gate = "PASS" if tactical.get("regime_gate_pass") else "FAIL"
+        sizing_cap = tactical.get("sizing_cap") if isinstance(tactical.get("sizing_cap"), str) else None
                 
         sparkline = [round(price - chg * 1.5, 2), round(price - chg * 0.5, 2), round(price, 2)] if price > 0 else [0.0, 0.0, 0.0]
         levels = SupportResistanceLevels(
@@ -225,6 +238,10 @@ async def get_stock_list(
                 hardFlags=hard_flags,
                 sparkline=sparkline,
                 levels=levels,
+                tacticalScore=tactical_score,
+                longTermScore=long_term_score,
+                regimeGate=regime_gate,
+                sizingCap=sizing_cap,
             )
         )
         
@@ -448,6 +465,28 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             except Exception as e:
                 logger.debug("Failed to commit automated strike price for %s: %s", symbol, e)
 
+    dual_payload = (scan.factor_results_json or {}).get("dual_horizon", {}) if scan and scan.factor_results_json else {}
+    tactical_payload = dual_payload.get("tactical", {}) if isinstance(dual_payload, dict) else {}
+    long_term_payload = dual_payload.get("long_term", {}) if isinstance(dual_payload, dict) else {}
+
+    dual_framework = DualFrameworkSchema(
+        tactical=TacticalFrameworkSchema(
+            score=tactical_payload.get("score") if isinstance(tactical_payload.get("score"), (int, float)) else None,
+            regime_gate_pass=bool(tactical_payload.get("regime_gate_pass", False)),
+            regime_fail_reasons=list(tactical_payload.get("regime_fail_reasons", [])),
+            conviction_tier=tactical_payload.get("conviction_tier") if isinstance(tactical_payload.get("conviction_tier"), str) else None,
+            sizing_cap=tactical_payload.get("sizing_cap") if isinstance(tactical_payload.get("sizing_cap"), str) else None,
+        ),
+        long_term=LongTermFrameworkSchema(
+            status=str(long_term_payload.get("status", "DATA_NOT_AVAILABLE")),
+            score=long_term_payload.get("score") if isinstance(long_term_payload.get("score"), (int, float)) else None,
+            thesis_strength_score=long_term_payload.get("thesis_strength_score") if isinstance(long_term_payload.get("thesis_strength_score"), (int, float)) else None,
+            entry_timing_score=long_term_payload.get("entry_timing_score") if isinstance(long_term_payload.get("entry_timing_score"), (int, float)) else None,
+            portfolio_fit_score=long_term_payload.get("portfolio_fit_score") if isinstance(long_term_payload.get("portfolio_fit_score"), (int, float)) else None,
+            missing_inputs=list(long_term_payload.get("missing_inputs", [])),
+        ),
+    )
+
     return StockDetailSchema(
         id=scan.id if scan else None,
         symbol=symbol,
@@ -469,6 +508,7 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             "strike_price": scan.strike_price,
             "stop_loss": scan.stop_loss,
         } if scan else None,
+        dualFramework=dual_framework,
     )
 
 
@@ -710,4 +750,78 @@ async def get_stock_synthesis(session: AsyncSession, symbol: str) -> StockSynthe
         symbol=symbol,
         reasons=reasons,
         newsSummary=news_summary
+    )
+
+
+async def get_dual_horizon_lists(session: AsyncSession) -> DualHorizonListResponseSchema:
+    """Return independent 30-day tactical and long-term lists from latest scan data."""
+    target_date = await _get_latest_scan_date(session) or date.today()
+    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+
+    stmt = (
+        select(DailyScan)
+        .where(DailyScan.scan_date >= start_dt)
+        .order_by(DailyScan.score.desc())
+    )
+    scans = list((await session.execute(stmt)).scalars().all())
+
+    tickers = [s.ticker for s in scans]
+    univ_map: dict[str, StockUniverse] = {}
+    if tickers:
+        univ_rows = (
+            await session.execute(
+                select(StockUniverse).where(StockUniverse.ticker.in_(tickers))
+            )
+        ).scalars().all()
+        univ_map = {u.ticker: u for u in univ_rows}
+
+    tactical_rows: list[FrameworkCandidateSchema] = []
+    long_term_rows: list[FrameworkCandidateSchema] = []
+
+    for scan in scans:
+        payload = scan.factor_results_json or {}
+        dual = payload.get("dual_horizon", {}) if isinstance(payload, dict) else {}
+        tactical = dual.get("tactical", {}) if isinstance(dual, dict) else {}
+        long_term = dual.get("long_term", {}) if isinstance(dual, dict) else {}
+
+        mdata = payload.get("market_data", {}) if isinstance(payload, dict) else {}
+        univ = univ_map.get(scan.ticker)
+        name = (mdata.get("name") if isinstance(mdata, dict) else None) or (univ.name if univ else scan.ticker)
+        sector = (mdata.get("sector") if isinstance(mdata, dict) else None) or (univ.sector if univ else "Unknown")
+
+        tactical_score = tactical.get("score") if isinstance(tactical.get("score"), (int, float)) else None
+        if bool(tactical.get("regime_gate_pass")) and isinstance(tactical_score, (int, float)):
+            tactical_rows.append(
+                FrameworkCandidateSchema(
+                    symbol=scan.ticker,
+                    name=name,
+                    sector=sector,
+                    score=round(float(tactical_score), 1),
+                    sizingCap=tactical.get("sizing_cap") if isinstance(tactical.get("sizing_cap"), str) else None,
+                    regimeGate="PASS",
+                )
+            )
+
+        long_term_score = long_term.get("score") if isinstance(long_term.get("score"), (int, float)) else None
+        if long_term.get("status") == "SCORED" and isinstance(long_term_score, (int, float)):
+            long_term_rows.append(
+                FrameworkCandidateSchema(
+                    symbol=scan.ticker,
+                    name=name,
+                    sector=sector,
+                    score=round(float(long_term_score), 1),
+                    sizingCap=None,
+                    regimeGate=None,
+                )
+            )
+
+    tactical_rows.sort(key=lambda x: x.score, reverse=True)
+    long_term_rows.sort(key=lambda x: x.score, reverse=True)
+
+    return DualHorizonListResponseSchema(
+        scanDate=target_date.isoformat(),
+        tacticalCount=len(tactical_rows),
+        longTermCount=len(long_term_rows),
+        tactical=tactical_rows,
+        longTerm=long_term_rows,
     )

@@ -298,6 +298,28 @@ class SupportResistanceLevels(BaseModel):
     resistance: float
 
 
+class TacticalFrameworkSchema(BaseModel):
+    score: Optional[float] = None
+    regime_gate_pass: bool = False
+    regime_fail_reasons: list[str] = []
+    conviction_tier: Optional[str] = None
+    sizing_cap: Optional[str] = None
+
+
+class LongTermFrameworkSchema(BaseModel):
+    status: str = "DATA_NOT_AVAILABLE"
+    score: Optional[float] = None
+    thesis_strength_score: Optional[float] = None
+    entry_timing_score: Optional[float] = None
+    portfolio_fit_score: Optional[float] = None
+    missing_inputs: list[str] = []
+
+
+class DualFrameworkSchema(BaseModel):
+    tactical: TacticalFrameworkSchema
+    long_term: LongTermFrameworkSchema
+
+
 class StockListItemSchema(BaseModel):
     symbol: str
     name: str
@@ -311,6 +333,10 @@ class StockListItemSchema(BaseModel):
     hardFlags: list[str]
     sparkline: list[float]
     levels: SupportResistanceLevels
+    tacticalScore: Optional[float] = None
+    longTermScore: Optional[float] = None
+    regimeGate: Optional[str] = None
+    sizingCap: Optional[str] = None
 
 
 class StockListResponseSchema(BaseModel):
@@ -358,6 +384,24 @@ class StockDetailSchema(BaseModel):
     news: list[NewsItemSchema] = []
     newsSummary: Optional[str] = None
     execution_details: Optional[dict[str, Any]] = None
+    dualFramework: Optional[DualFrameworkSchema] = None
+
+
+class FrameworkCandidateSchema(BaseModel):
+    symbol: str
+    name: str
+    sector: str
+    score: float
+    sizingCap: Optional[str] = None
+    regimeGate: Optional[str] = None
+
+
+class DualHorizonListResponseSchema(BaseModel):
+    scanDate: str
+    tacticalCount: int
+    longTermCount: int
+    tactical: list[FrameworkCandidateSchema]
+    longTerm: list[FrameworkCandidateSchema]
 
 
 class StockSynthesisSchema(BaseModel):

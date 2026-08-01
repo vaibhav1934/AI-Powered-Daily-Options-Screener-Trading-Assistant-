@@ -20,7 +20,7 @@ from app.api.stockglass import router as stockglass_router
 from app.api.watchlist import router as watchlist_router
 
 api_router = APIRouter(prefix="/v1")
-root_api_router = APIRouter()  # Fallback router without /v1 prefix so /stocks and /v1/stocks both work
+root_api_router = APIRouter()
 internal_router = APIRouter(dependencies=[Depends(verify_api_key)])
 
 internal_router.include_router(scans_router)
@@ -34,7 +34,3 @@ internal_router.include_router(portfolio_router)
 api_router.include_router(auth_router)
 api_router.include_router(internal_router)
 api_router.include_router(stockglass_router)
-
-root_api_router.include_router(auth_router)
-root_api_router.include_router(internal_router)
-root_api_router.include_router(stockglass_router)

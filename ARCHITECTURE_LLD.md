@@ -506,7 +506,8 @@ The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sl
 * **API_SECRET_KEY must be set in HF Secrets:** The frontend sends `X-API-Key: dev_key` on every request. The backend validates this against `API_SECRET_KEY` from environment. If missing, the backend falls back to `"change-me-in-production"` which causes 401 errors.
 * **Trailing newlines in HF secrets:** Pasting secrets manually in the HF UI often appends `\n`. The `DATABASE_URL` field validator in `config.py` strips these automatically using `@field_validator`.
 * **`/chat` POST trailing slash:** FastAPI's trailing-slash redirect (307) on `POST /chat/` converts POST to GET, breaking the SSE stream. Both `@router.post("")` and `@router.post("/")` are registered to prevent this.
-* **Root & fallback routes:** All API routes are registered under both `/v1/...` (canonical) and `/...` (fallback) prefixes to handle missing `/v1` in frontend environment variables.
+* **Versioned API namespace:** All production REST endpoints are exposed under `/v1/...` only.
+    Root fallback aliases (such as `/stocks`, `/chat`, `/watchlist`, `/debug`, `/auth`) are intentionally disabled to enforce a single stable contract.
 * **CORS:** `allow_origin_regex` covers `*.vercel.app` and `*.hf.space` wildcard domains for all preview and production deployments.
 
 ### Required Hugging Face Secrets
@@ -520,7 +521,7 @@ The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sl
 
 ---
 
-## 11. Scan Pipeline — Design & Fixes (2026-07-28)
+## 12. Scan Pipeline — Design & Fixes (2026-07-28)
 
 ### How the Scan Pipeline Works
 
@@ -553,5 +554,99 @@ The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sl
 | `UnboundLocalError: scan_empty` | Hard crash in SSE stream | Moved variable initialization outside `for` loop |
 | SQL date boundary bug (days 28–31) | `get_scan_results` returned empty for late-month dates | Replaced hardcoded day math with `timedelta(days=1)` |
 | `ConnectionDoesNotExistError` (asyncpg) | Scan crashed mid-write after 30–90s of Finnhub API calls | Refactored to use three short-lived sessions: (1) quick read at start, (2) no session held during Finnhub work, (3) fresh write session at end |
+
+---
+
+## 13. Dual-Horizon Selection Framework (2026-08-01)
+
+### Objective
+The scan pipeline now computes two independent selection outputs from the same live data snapshot:
+1. **30-Day Tactical Engine** (catalyst + setup + options mechanics, gated by macro regime checks).
+2. **Long-Term Investment Engine** (business quality + valuation readiness with strict data availability checks).
+
+This design prevents short-term catalyst positioning from contaminating long-term conviction sizing.
+
+### Implementation Files
+| File | Change |
+|---|---|
+| `backend/app/framework/dual_horizon.py` | Added tactical and long-term evaluators and output contract builders |
+| `backend/app/services/fundamentals_service.py` | Added live fundamentals ingestion (`yfinance`) for long-term engine inputs |
+| `backend/app/framework/factors/base.py` | Extended `ScanContext` with typed fundamentals fields |
+| `backend/app/framework/engine.py` | Mapped fundamentals fields from ticker payload into `ScanContext` |
+| `backend/app/services/scan_service.py` | Persisted dual-horizon payload into `daily_scans.factor_results_json.dual_horizon` |
+| `backend/app/services/stockglass_service.py` | Exposed dual-horizon payload in stock list/detail and built dedicated dual-list response |
+| `backend/app/api/stockglass.py` | Added route: `GET /v1/stocks/dual-horizon` |
+| `backend/app/db/schemas.py` | Added dual-horizon API schemas |
+
+### New API Route
+`GET /v1/stocks/dual-horizon`
+
+Response model: `DualHorizonListResponseSchema`
+
+```json
+{
+    "scanDate": "2026-08-01",
+    "tacticalCount": 27,
+    "longTermCount": 11,
+    "tactical": [
+        {
+            "symbol": "NVDA",
+            "name": "NVIDIA Corporation",
+            "sector": "Semiconductors",
+            "score": 8.1,
+            "sizingCap": "100%",
+            "regimeGate": "PASS"
+        }
+    ],
+    "longTerm": [
+        {
+            "symbol": "MSFT",
+            "name": "Microsoft Corporation",
+            "sector": "Technology",
+            "score": 7.4,
+            "sizingCap": null,
+            "regimeGate": null
+        }
+    ]
+}
+```
+
+### Persisted Runtime Schema (`daily_scans.factor_results_json.dual_horizon`)
+```json
+{
+    "tactical": {
+        "score": 7.3,
+        "regime_gate_pass": true,
+        "regime_fail_reasons": [],
+        "catalyst_signals": ["EARNINGS_WINDOW"],
+        "technical_signals": ["PRICE_ABOVE_SMA50"],
+        "options_signals": ["OPTION_CONTRACT_AVAILABLE"],
+        "conviction_tier": "FULL_SIZE",
+        "sizing_cap": "100%",
+        "entry_cutoff": "11:00 AM CST (10:30 AM CST Fridays)",
+        "binary_event_exit": "EXIT_BEFORE_EARNINGS_UNLESS_EXPLICIT_OVERRIDE",
+        "invalidation_rule": "SET_AT_ENTRY_NO_EMOTIONAL_OVERRIDE"
+    },
+    "long_term": {
+        "status": "SCORED",
+        "score": 6.9,
+        "thesis_strength_score": 7.2,
+        "entry_timing_score": 6.0,
+        "portfolio_fit_score": 6.0,
+        "missing_inputs": [],
+        "thesis_break_condition": "FUNDAMENTAL_THESIS_BREAK_ONLY"
+    }
+}
+```
+
+### Validation & Error Behavior
+1. **No synthetic fundamentals:** If fundamentals are missing from live feed, each missing field is explicitly listed in `long_term.missing_inputs`.
+2. **Long-term score suppression:** If required long-term inputs are incomplete, status is `DATA_NOT_AVAILABLE` and long-term score is `null`.
+3. **Regime hard gate:** Tactical candidates with triggered `F45`, `F49`, `F50`, or post-cutoff state fail regime gate and are excluded from tactical list output.
+4. **Legacy list compatibility:** `daily_scans.list_type` remains populated for compatibility; dual-horizon list consumption should use `GET /v1/stocks/dual-horizon` as source of truth.
+
+### Routing Note (2026-08-01)
+`/v1/scans/trigger` is the canonical and only supported scan trigger route.
+The root alias `/scans/trigger` was removed to prevent duplicate endpoint exposure.
 
 
