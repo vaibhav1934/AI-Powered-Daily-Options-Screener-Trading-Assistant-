@@ -150,11 +150,11 @@ export function Navbar({
 
           {authed ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8f9fa", padding: "4px 12px", borderRadius: 20, border: "1px solid #e8eaed" }}>
-              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#34a853" }} title="Authenticated Institutional Access" />
+              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#34a853" }} title="Authenticated" />
               {!isMobile && <span style={{ fontSize: 13, fontWeight: 600, color: "#202124" }}>{user?.username || "Trader"}</span>}
               <button
                 onClick={handleLogout}
-                title="Log out of institutional account"
+                title="Log out"
                 style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex", alignItems: "center", color: "#5f6368" }}
               >
                 <LogOut size={14} />
@@ -179,7 +179,7 @@ export function Navbar({
                 transition: "all 0.15s ease",
               }}
             >
-              <Lock size={13} /> {!isMobile && "Institutional Login"}
+              <Lock size={13} /> {!isMobile && "Login"}
             </button>
           )}
 

@@ -1,6 +1,6 @@
 // src/lib/stockglass_api.ts
 // Production API Client for StockGlass AI Contract v1 (Zero Client-Side Mock Data)
-import { API_BASE_URL } from "./config";
+import { API_BASE_URL, API_BASE_URL_ERROR } from "./config";
 import { authFetch, authFetchStrict } from "./auth";
 import {
   DualHorizonResponse,
@@ -21,8 +21,32 @@ const DEFAULT_HEADERS: HeadersInit = {
   "X-API-Key": "dev_key",
 };
 
+async function readBackendErrorMessage(res: Response): Promise<string | null> {
+  try {
+    const body = await res.clone().json();
+    const nestedMessage = body?.error?.message;
+    if (typeof nestedMessage === "string" && nestedMessage.trim()) {
+      return nestedMessage.trim();
+    }
+    const detailMessage = body?.detail?.message;
+    if (typeof detailMessage === "string" && detailMessage.trim()) {
+      return detailMessage.trim();
+    }
+  } catch {
+    // Response is not JSON; ignore and use generic fallback.
+  }
+  return null;
+}
+
+function requireApiBaseUrl(): string {
+  if (API_BASE_URL_ERROR) {
+    throw new Error(API_BASE_URL_ERROR);
+  }
+  return API_BASE_URL;
+}
+
 export async function fetchIndices(): Promise<IndexItem[]> {
-  const targetUrl = `${API_BASE_URL}/indices`;
+  const targetUrl = `${requireApiBaseUrl()}/indices`;
   console.log("[FLOW: Frontend API] ──> fetchIndices: Requesting GET", targetUrl);
   const res = await authFetch(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -48,7 +72,7 @@ export interface FetchStocksParams {
 }
 
 export async function fetchStocks(params: FetchStocksParams = {}): Promise<StockListResponse> {
-  const url = new URL(`${API_BASE_URL}/stocks`);
+  const url = new URL(`${requireApiBaseUrl()}/stocks`);
   if (params.list) url.searchParams.append("list", params.list);
   if (params.sector) url.searchParams.append("sector", params.sector);
   if (params.minScore !== undefined) url.searchParams.append("minScore", params.minScore.toString());
@@ -72,7 +96,7 @@ export async function fetchStocks(params: FetchStocksParams = {}): Promise<Stock
 }
 
 export async function fetchStockDetail(symbol: string): Promise<StockDetail> {
-  const targetUrl = `${API_BASE_URL}/stocks/${encodeURIComponent(symbol)}`;
+  const targetUrl = `${requireApiBaseUrl()}/stocks/${encodeURIComponent(symbol)}`;
   console.log("[FLOW: Frontend API] ──> fetchStockDetail: Requesting GET", targetUrl);
   const res = await authFetch(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -86,7 +110,7 @@ export async function fetchStockDetail(symbol: string): Promise<StockDetail> {
 }
 
 export async function fetchStockSynthesis(symbol: string): Promise<StockSynthesis> {
-  const targetUrl = `${API_BASE_URL}/stocks/${encodeURIComponent(symbol)}/synthesis`;
+  const targetUrl = `${requireApiBaseUrl()}/stocks/${encodeURIComponent(symbol)}/synthesis`;
   console.log("[FLOW: Frontend API] ──> fetchStockSynthesis: Requesting GET", targetUrl);
   const res = await authFetch(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -100,7 +124,7 @@ export async function fetchStockSynthesis(symbol: string): Promise<StockSynthesi
 }
 
 export async function fetchStockFactors(symbol: string): Promise<FullFactorBreakdown> {
-  const targetUrl = `${API_BASE_URL}/stocks/${encodeURIComponent(symbol)}/factors`;
+  const targetUrl = `${requireApiBaseUrl()}/stocks/${encodeURIComponent(symbol)}/factors`;
   console.log("[FLOW: Frontend API] ──> fetchStockFactors: Requesting GET", targetUrl);
   const res = await authFetch(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -114,7 +138,7 @@ export async function fetchStockFactors(symbol: string): Promise<FullFactorBreak
 }
 
 export async function fetchStockFactorAudit(symbol: string): Promise<FactorAuditPayload> {
-  const targetUrl = `${API_BASE_URL}/stocks/${encodeURIComponent(symbol)}/factor-audit?forceLive=true&requireAllLive=false`;
+  const targetUrl = `${requireApiBaseUrl()}/stocks/${encodeURIComponent(symbol)}/factor-audit?forceLive=true&requireAllLive=false`;
   console.log("[FLOW: Frontend API] ──> fetchStockFactorAudit: Requesting GET", targetUrl);
   const res = await authFetch(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -128,7 +152,7 @@ export async function fetchStockFactorAudit(symbol: string): Promise<FactorAudit
 }
 
 export async function fetchDualHorizonLists(): Promise<DualHorizonResponse> {
-  const targetUrl = `${API_BASE_URL}/stocks/dual-horizon`;
+  const targetUrl = `${requireApiBaseUrl()}/stocks/dual-horizon`;
   console.log("[FLOW: Frontend API] ──> fetchDualHorizonLists: Requesting GET", targetUrl);
   const res = await authFetch(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -136,13 +160,16 @@ export async function fetchDualHorizonLists(): Promise<DualHorizonResponse> {
   });
   if (!res.ok) {
     console.error("[FLOW: Frontend API] <── fetchDualHorizonLists FAILED HTTP", res.status);
-    throw new Error(`Failed to fetch dual-horizon lists (HTTP ${res.status})`);
+    if (res.status === 404) {
+      throw new Error(`Dual-horizon endpoint not found at ${targetUrl}. Check NEXT_PUBLIC_API_URL and backend route deployment.`);
+    }
+    throw new Error(`Failed to fetch dual-horizon lists from ${targetUrl} (HTTP ${res.status})`);
   }
   return res.json();
 }
 
 export async function fetchPortfolioScore(): Promise<PortfolioScoreResponse> {
-  const targetUrl = `${API_BASE_URL}/portfolio/score`;
+  const targetUrl = `${requireApiBaseUrl()}/portfolio/score`;
   console.log("[FLOW: Frontend API] ──> fetchPortfolioScore: Requesting GET", targetUrl);
   const res = await authFetchStrict(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -150,13 +177,23 @@ export async function fetchPortfolioScore(): Promise<PortfolioScoreResponse> {
   });
   if (!res.ok) {
     console.error("[FLOW: Frontend API] <── fetchPortfolioScore FAILED HTTP", res.status);
-    throw new Error(`Failed to fetch portfolio score (HTTP ${res.status})`);
+    const backendMessage = await readBackendErrorMessage(res);
+    if (backendMessage && backendMessage.toLowerCase().includes("database connection failed")) {
+      throw new Error("Database unavailable. Check backend DATABASE_URL / host DNS resolution and retry.");
+    }
+    if (res.status === 404) {
+      throw new Error(`Portfolio score endpoint not found at ${targetUrl}. Check NEXT_PUBLIC_API_URL and backend route deployment.`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Portfolio score requires a valid logged-in session. Please log in again.");
+    }
+    throw new Error(`Failed to fetch portfolio score from ${targetUrl} (HTTP ${res.status})`);
   }
   return res.json();
 }
 
 export async function fetchPortfolioOptimization(cadence: "weekly" | "regime_shift" = "weekly"): Promise<PortfolioOptimizationResponse> {
-  const targetUrl = `${API_BASE_URL}/portfolio/optimize?cadence=${encodeURIComponent(cadence)}`;
+  const targetUrl = `${requireApiBaseUrl()}/portfolio/optimize?cadence=${encodeURIComponent(cadence)}`;
   console.log("[FLOW: Frontend API] ──> fetchPortfolioOptimization: Requesting GET", targetUrl);
   const res = await authFetchStrict(targetUrl, {
     headers: DEFAULT_HEADERS,
@@ -164,13 +201,23 @@ export async function fetchPortfolioOptimization(cadence: "weekly" | "regime_shi
   });
   if (!res.ok) {
     console.error("[FLOW: Frontend API] <── fetchPortfolioOptimization FAILED HTTP", res.status);
-    throw new Error(`Failed to fetch portfolio optimization (HTTP ${res.status})`);
+    const backendMessage = await readBackendErrorMessage(res);
+    if (backendMessage && backendMessage.toLowerCase().includes("database connection failed")) {
+      throw new Error("Database unavailable. Check backend DATABASE_URL / host DNS resolution and retry.");
+    }
+    if (res.status === 404) {
+      throw new Error(`Portfolio optimization endpoint not found at ${targetUrl}. Check NEXT_PUBLIC_API_URL and backend route deployment.`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Portfolio optimization requires a valid logged-in session. Please log in again.");
+    }
+    throw new Error(`Failed to fetch portfolio optimization from ${targetUrl} (HTTP ${res.status})`);
   }
   return res.json();
 }
 
 export async function createPaperPosition(input: { symbol: string; qty: number; entryPrice: number }): Promise<PositionItem> {
-  const targetUrl = `${API_BASE_URL}/positions`;
+  const targetUrl = `${requireApiBaseUrl()}/positions`;
   console.log("[FLOW: Frontend API] ──> createPaperPosition: Requesting POST", targetUrl);
   const res = await authFetchStrict(targetUrl, {
     method: "POST",
@@ -180,13 +227,17 @@ export async function createPaperPosition(input: { symbol: string; qty: number; 
   });
   if (!res.ok) {
     console.error("[FLOW: Frontend API] <── createPaperPosition FAILED HTTP", res.status);
+    const backendMessage = await readBackendErrorMessage(res);
+    if (backendMessage && backendMessage.toLowerCase().includes("database connection failed")) {
+      throw new Error("Database unavailable. Cannot create paper position until DB connectivity is restored.");
+    }
     throw new Error(`Failed to create paper position (HTTP ${res.status})`);
   }
   return res.json();
 }
 
 export async function fetchPaperPositions(status?: "open" | "closed"): Promise<PositionListResponse> {
-  const targetUrl = new URL(`${API_BASE_URL}/positions`);
+  const targetUrl = new URL(`${requireApiBaseUrl()}/positions`);
   if (status) {
     targetUrl.searchParams.append("status", status);
   }
@@ -197,13 +248,17 @@ export async function fetchPaperPositions(status?: "open" | "closed"): Promise<P
   });
   if (!res.ok) {
     console.error("[FLOW: Frontend API] <── fetchPaperPositions FAILED HTTP", res.status);
+    const backendMessage = await readBackendErrorMessage(res);
+    if (backendMessage && backendMessage.toLowerCase().includes("database connection failed")) {
+      throw new Error("Database unavailable. Cannot load paper positions until DB connectivity is restored.");
+    }
     throw new Error(`Failed to fetch paper positions (HTTP ${res.status})`);
   }
   return res.json();
 }
 
 export async function closePaperPosition(positionId: string): Promise<PositionItem> {
-  const targetUrl = `${API_BASE_URL}/positions/${encodeURIComponent(positionId)}`;
+  const targetUrl = `${requireApiBaseUrl()}/positions/${encodeURIComponent(positionId)}`;
   console.log("[FLOW: Frontend API] ──> closePaperPosition: Requesting DELETE", targetUrl);
   const res = await authFetchStrict(targetUrl, {
     method: "DELETE",
@@ -212,6 +267,10 @@ export async function closePaperPosition(positionId: string): Promise<PositionIt
   });
   if (!res.ok) {
     console.error("[FLOW: Frontend API] <── closePaperPosition FAILED HTTP", res.status);
+    const backendMessage = await readBackendErrorMessage(res);
+    if (backendMessage && backendMessage.toLowerCase().includes("database connection failed")) {
+      throw new Error("Database unavailable. Cannot close paper position until DB connectivity is restored.");
+    }
     throw new Error(`Failed to close paper position (HTTP ${res.status})`);
   }
   return res.json();

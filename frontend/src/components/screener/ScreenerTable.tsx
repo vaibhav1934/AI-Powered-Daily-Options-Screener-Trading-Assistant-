@@ -25,6 +25,7 @@ interface ScreenerTableProps {
   totalPages: number;
   onPageChange?: (page: number) => void;
   isMobile?: boolean;
+  onAddPaperTrade?: (payload: { symbol: string; entryPrice: number; qty: number }) => Promise<void>;
 }
 
 export function ScreenerTable({
@@ -46,9 +47,14 @@ export function ScreenerTable({
   totalPages,
   onPageChange,
   isMobile,
+  onAddPaperTrade,
 }: ScreenerTableProps) {
   const PAGE_SIZE = 10;
   const [horizonPage, setHorizonPage] = useState(1);
+  const [paperQty, setPaperQty] = useState("1");
+  const [addingSymbol, setAddingSymbol] = useState<string | null>(null);
+  const [paperMessage, setPaperMessage] = useState<string | null>(null);
+  const [paperError, setPaperError] = useState<string | null>(null);
 
   useEffect(() => {
     setHorizonPage(1);
@@ -79,10 +85,42 @@ export function ScreenerTable({
   const currentTotalPages = isAllMode ? totalPages : horizonTotalPages;
   const startItem = displayTotal === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const endItem = Math.min(currentPage * PAGE_SIZE, displayTotal);
+  const parsedPaperQty = Number(paperQty);
+  const canSubmitPaperQty = Number.isFinite(parsedPaperQty) && parsedPaperQty > 0;
 
   const showLoading = isAllMode
     ? Boolean(loading && (!items || items.length === 0))
     : Boolean(loadingHorizon && sortedHorizon.length === 0);
+
+  const handleAddPaperTrade = async (payload: { symbol: string; entryPrice: number; qty: number }) => {
+    if (!onAddPaperTrade) {
+      return;
+    }
+    setPaperMessage(null);
+    setPaperError(null);
+    if (!canSubmitPaperQty) {
+      setPaperError("Quantity must be a positive number.");
+      return;
+    }
+    if (!(payload.entryPrice > 0)) {
+      setPaperError(`Live price unavailable for ${payload.symbol}; cannot open paper position.`);
+      return;
+    }
+
+    setAddingSymbol(payload.symbol);
+    try {
+      await onAddPaperTrade({
+        symbol: payload.symbol,
+        entryPrice: payload.entryPrice,
+        qty: parsedPaperQty,
+      });
+      setPaperMessage(`Paper position opened: ${payload.symbol} x${parsedPaperQty} @ $${payload.entryPrice.toFixed(2)}`);
+    } catch (err: any) {
+      setPaperError(err?.message || `Failed to open paper position for ${payload.symbol}.`);
+    } finally {
+      setAddingSymbol(null);
+    }
+  };
 
   if (showLoading) {
     return (
@@ -141,6 +179,26 @@ export function ScreenerTable({
             Showing <span style={{ fontWeight: 600 }}>{startItem}</span> - <span style={{ fontWeight: 600 }}>{endItem}</span> of <span style={{ fontWeight: 600 }}>{displayTotal}</span>{" "}
             {isAllMode ? "stocks" : "candidates"}
           </div>
+          {onAddPaperTrade && isAllMode ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "#5f6368" }}>Paper Qty</span>
+              <input
+                value={paperQty}
+                onChange={(e) => setPaperQty(e.target.value)}
+                inputMode="decimal"
+                placeholder="1"
+                style={{
+                  width: 66,
+                  fontSize: 12,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #dadce0",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          ) : null}
           {isMobile && onSort && isAllMode && (
             <select
               onChange={(e) => onSort(e.target.value)}
@@ -194,6 +252,7 @@ export function ScreenerTable({
                 >
                   Score
                 </th>
+                <th style={{ textAlign: "right", padding: "8px", fontSize: 12, color: "#5f6368", fontWeight: 500 }}>Paper</th>
               </tr>
             </thead>
           )}
@@ -228,6 +287,9 @@ export function ScreenerTable({
                   onToggleWatch={onToggleWatch}
                   onSelect={onSelect}
                   selected={selectedSymbol === item.symbol}
+                  paperQty={canSubmitPaperQty ? parsedPaperQty : 1}
+                  adding={addingSymbol === item.symbol}
+                  onAddPaperTrade={onAddPaperTrade ? handleAddPaperTrade : undefined}
                   isMobile={isMobile}
                 />
               ))}
@@ -299,7 +361,7 @@ export function ScreenerTable({
 
             {isAllMode && items.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "#5f6368", fontSize: 14 }}>
+                <td colSpan={9} style={{ padding: 24, textAlign: "center", color: "#5f6368", fontSize: 14 }}>
                   No stocks match these filters. Try clearing a sector or lowering the score threshold.
                 </td>
               </tr>
@@ -307,13 +369,25 @@ export function ScreenerTable({
 
             {!isAllMode && pagedHorizon.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#5f6368", fontSize: 14 }}>
+                <td colSpan={7} style={{ padding: 24, textAlign: "center", color: "#5f6368", fontSize: 14 }}>
                   {horizonError || "No candidates in this horizon for the latest scan."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        {paperError ? (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#c5221f" }}>{paperError}</div>
+        ) : null}
+        {paperMessage ? (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#137333" }}>{paperMessage}</div>
+        ) : null}
+        {onAddPaperTrade && !isAllMode ? (
+          <div style={{ marginTop: 8, fontSize: 12, color: "#5f6368" }}>
+            Paper-trade add is enabled in All Universe rows where live entry price is available.
+          </div>
+        ) : null}
       </div>
 
       <div>

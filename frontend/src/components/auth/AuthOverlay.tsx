@@ -1,5 +1,5 @@
 // src/components/auth/AuthOverlay.tsx
-// Glassmorphic Authentication Overlay for Institutional Features (Brand Aesthetic)
+// Glassmorphic Authentication Overlay for protected features
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -17,7 +17,7 @@ interface AuthOverlayProps {
 export default function AuthOverlay({
   children,
   featureName = "Deep Analytics & AI Chat",
-  description = "Log in with institutional credentials to access 50-factor breakdowns, live options chain execution, and AI trading assistant synthesis.",
+  description = "Log in to access 50-factor breakdowns, live options chain execution, and AI trading assistant synthesis.",
   onLoginSuccess,
 }: AuthOverlayProps) {
   const [authed, setAuthed] = useState(false);
@@ -154,7 +154,7 @@ export default function AuthOverlay({
               gap: 4,
             }}
           >
-            <ShieldCheck size={12} /> Institutional Verification
+            <ShieldCheck size={12} /> Login Required
           </span>
 
           <h3 style={{ fontSize: 18, fontWeight: 700, color: "#202124", margin: "0 0 8px", letterSpacing: -0.3 }}>

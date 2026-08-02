@@ -109,6 +109,8 @@ export function PortfolioSummaryStrip({ score, optimization, loading, error }: P
                 <div className="skeleton-pulse skeleton-line" style={{ width: 108, height: 28, borderRadius: 999 }} />
               </div>
             </div>
+          ) : error ? (
+            <div style={{ fontSize: 12, color: "#c5221f" }}>{error}</div>
           ) : weakest.length === 0 ? (
             <div style={{ fontSize: 12, color: "#5f6368" }}>
               No book-level issues yet. Add a paper position to activate portfolio analytics.

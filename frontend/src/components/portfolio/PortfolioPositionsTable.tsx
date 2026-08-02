@@ -42,7 +42,7 @@ export function PortfolioPositionsTable({ positions, loading, onRefresh }: Portf
       {loading ? (
         <div style={{ padding: 24, color: "#5f6368", fontSize: 13 }}>Loading positions...</div>
       ) : positions.length === 0 ? (
-        <div style={{ padding: 24, color: "#5f6368", fontSize: 13 }}>No open paper positions yet. Add one from the portfolio workspace form above.</div>
+        <div style={{ padding: 24, color: "#5f6368", fontSize: 13 }}>No open paper positions yet. Add one directly from a screener row using + Paper.</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

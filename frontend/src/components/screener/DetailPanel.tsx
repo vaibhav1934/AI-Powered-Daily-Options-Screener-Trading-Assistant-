@@ -16,6 +16,19 @@ interface DetailPanelProps {
   error?: string | null;
   onOpenFactors: () => void;
   onAskAi?: (prompt: string) => void;
+  onAddPaperTrade?: (payload: { symbol: string; entryPrice: number; qty: number }) => Promise<void>;
+}
+
+function formatOccSymbol(ticker: string, strike: number, isCall: boolean = true, targetDteDays: number = 35): string {
+  const d = new Date();
+  d.setDate(d.getDate() + targetDteDays);
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const cp = isCall ? "C" : "P";
+  const strikeInt = Math.round(strike * 1000);
+  const strikeStr = String(strikeInt).padStart(8, "0");
+  return `${ticker.toUpperCase()}${yy}${mm}${dd}${cp}${strikeStr}`;
 }
 
 export function DetailPanel({
@@ -25,6 +38,7 @@ export function DetailPanel({
   error,
   onOpenFactors,
   onAskAi,
+  onAddPaperTrade,
 }: DetailPanelProps) {
   const [uploadingChain, setUploadingChain] = useState(false);
   const [localStrike, setLocalStrike] = useState<number | null>(null);
@@ -32,6 +46,10 @@ export function DetailPanel({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [synthesis, setSynthesis] = useState<StockSynthesis | null>(null);
   const [loadingSynthesis, setLoadingSynthesis] = useState(false);
+  const [addingStock, setAddingStock] = useState(false);
+  const [addingOption, setAddingOption] = useState(false);
+  const [paperMessage, setPaperMessage] = useState<string | null>(null);
+  const [paperError, setPaperError] = useState<string | null>(null);
 
   useEffect(() => {
     if (detail) {
@@ -242,6 +260,99 @@ export function DetailPanel({
               {aiSelection.open_interest && (
                 <div style={{ marginTop: 6, color: "#5f6368", fontSize: 10.5, fontWeight: 500 }}>
                   OI: {aiSelection.open_interest} | Bid/Ask: {aiSelection.bid_ask || "Tight"}
+                </div>
+              )}
+            </div>
+          )}
+
+          {onAddPaperTrade && (
+            <div style={{ borderTop: "1px solid #e8eaed", marginTop: 10, paddingTop: 10 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5f6368", marginBottom: 6 }}>
+                Add Position to Paper Portfolio:
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  disabled={addingStock || addingOption}
+                  onClick={async () => {
+                    setPaperMessage(null);
+                    setPaperError(null);
+                    setAddingStock(true);
+                    try {
+                      await onAddPaperTrade({
+                        symbol: detail.symbol,
+                        entryPrice: detail.price,
+                        qty: 1,
+                      });
+                      setPaperMessage(`Added ${detail.symbol} Stock to paper portfolio.`);
+                    } catch (err: any) {
+                      setPaperError(err?.message || "Failed to add stock position.");
+                    } finally {
+                      setAddingStock(false);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "6px 10px",
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: "1px solid #1a73e8",
+                    background: "#e8f0fe",
+                    color: "#1a73e8",
+                    cursor: "pointer",
+                  }}
+                >
+                  {addingStock ? "Adding..." : `+ Paper Stock ($${detail.price.toFixed(2)})`}
+                </button>
+
+                {localStrike ? (
+                  <button
+                    disabled={addingStock || addingOption}
+                    onClick={async () => {
+                      setPaperMessage(null);
+                      setPaperError(null);
+                      setAddingOption(true);
+                      try {
+                        const isCall = !(aiSelection?.contract_type || "").toLowerCase().includes("put");
+                        const occSym = formatOccSymbol(detail.symbol, localStrike, isCall);
+                        const estPrice = Math.round(Math.max(1.5, detail.price * 0.03) * 100) / 100;
+                        await onAddPaperTrade({
+                          symbol: occSym,
+                          entryPrice: estPrice,
+                          qty: 1,
+                        });
+                        setPaperMessage(`Added Option ${occSym} ($${localStrike} Strike) to paper portfolio.`);
+                      } catch (err: any) {
+                        setPaperError(err?.message || "Failed to add option position.");
+                      } finally {
+                        setAddingOption(false);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "6px 10px",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      borderRadius: 6,
+                      border: "1px solid #137333",
+                      background: "#e6f4ea",
+                      color: "#137333",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {addingOption ? "Adding..." : `+ Paper Option ($${localStrike.toFixed(2)})`}
+                  </button>
+                ) : null}
+              </div>
+
+              {paperMessage && (
+                <div style={{ marginTop: 6, fontSize: 11, color: "#137333", fontWeight: 500 }}>
+                  {paperMessage}
+                </div>
+              )}
+              {paperError && (
+                <div style={{ marginTop: 6, fontSize: 11, color: "#c5221f", fontWeight: 500 }}>
+                  {paperError}
                 </div>
               )}
             </div>

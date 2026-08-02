@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { IndexItem, StockListItem, StockDetail, ChatMessage, DualHorizonResponse, PortfolioOptimizationResponse, PortfolioScoreResponse, ViewMode } from "@/types/stockglass";
 import { Sparkles, X, BarChart2 } from "lucide-react";
-import { fetchIndices, fetchStocks, fetchStockDetail, fetchDualHorizonLists, fetchPortfolioOptimization, fetchPortfolioScore, fetchStockFactorAudit } from "@/lib/stockglass_api";
+import { createPaperPosition, fetchIndices, fetchStocks, fetchStockDetail, fetchDualHorizonLists, fetchPortfolioOptimization, fetchPortfolioScore, fetchStockFactorAudit } from "@/lib/stockglass_api";
 import { DOWNLOAD_AUDIT_OUTPUT } from "@/lib/config";
 import { Navbar } from "@/components/layout/Navbar";
 import { IndicesStrip } from "@/components/screener/IndicesStrip";
@@ -13,6 +13,7 @@ import { DetailPanel } from "@/components/screener/DetailPanel";
 import { FactorModal } from "@/components/screener/FactorModal";
 import { AIChatPanel } from "@/components/chat/AIChatPanel";
 import AuthOverlay from "@/components/auth/AuthOverlay";
+import { isAuthenticated } from "@/lib/auth";
 
 export default function StockGlassProDashboard() {
   const downloadAuditJson = useCallback((symbol: string, payload: unknown) => {
@@ -146,6 +147,13 @@ export default function StockGlassProDashboard() {
 
   // 1C. Fetch portfolio score + optimization on mount
   const loadPortfolio = useCallback(async () => {
+    if (!isAuthenticated()) {
+      setPortfolioScore(null);
+      setPortfolioOptimization(null);
+      setPortfolioError("Login required for portfolio analytics");
+      setLoadingPortfolio(false);
+      return;
+    }
     setPortfolioError(null);
     setLoadingPortfolio(true);
     try {
@@ -156,11 +164,28 @@ export default function StockGlassProDashboard() {
       setPortfolioScore(scoreRes);
       setPortfolioOptimization(optRes);
     } catch (err: any) {
-      setPortfolioError(err?.message || "Portfolio analytics unavailable");
+      const rawMessage = err?.message || "Portfolio analytics unavailable";
+      const normalized = String(rawMessage).toLowerCase();
+      if (normalized.includes("failed to fetch")) {
+        setPortfolioError("Unable to reach portfolio API. Verify NEXT_PUBLIC_API_URL and backend availability.");
+      } else {
+        setPortfolioError(rawMessage);
+      }
     } finally {
       setLoadingPortfolio(false);
     }
   }, []);
+
+  const handleAddPaperTradeFromScreener = useCallback(
+    async (payload: { symbol: string; entryPrice: number; qty: number }) => {
+      if (!isAuthenticated()) {
+        throw new Error("Login required to open paper positions.");
+      }
+      await createPaperPosition(payload);
+      await loadPortfolio();
+    },
+    [loadPortfolio]
+  );
 
   useEffect(() => {
     loadPortfolio();
@@ -375,6 +400,7 @@ export default function StockGlassProDashboard() {
           error={detailError}
           onOpenFactors={() => setShowFactors(true)}
           onAskAi={handleAskAi}
+          onAddPaperTrade={handleAddPaperTradeFromScreener}
         />
       ) : (
         <AIChatPanel
@@ -499,6 +525,7 @@ export default function StockGlassProDashboard() {
             totalPages={totalPages}
             onPageChange={(p) => setCurrentPage(p)}
             isMobile={isMobile}
+            onAddPaperTrade={handleAddPaperTradeFromScreener}
           />
         )}
 

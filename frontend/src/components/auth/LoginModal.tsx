@@ -1,5 +1,5 @@
 // src/components/auth/LoginModal.tsx
-// Institutional Login Modal for StockGlass AI (Brand Color Aesthetic)
+// Login modal for StockGlass AI
 "use client";
 
 import React, { useState } from "react";

@@ -3,7 +3,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "StockGlass AI — Institutional Options & Stock Screener",
+  title: "StockGlass AI — Options & Stock Screener",
   description: "Automated 50-factor scanning framework and GenAI assistant",
 };
 

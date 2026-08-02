@@ -23,6 +23,61 @@ The scan pipeline now forwards the following previously-missing fields directly 
 Residual limitation:
 1. Ecosystem relationship quality remains a free-data proxy (sector-cohort based) and is not yet a true supply-chain graph.
 
+### Implementation Update (2026-08-02): Full 50-Factor Audit JSON Export
+
+The stock detail click workflow now supports a full audit export for every evaluated ticker:
+1. New endpoint `GET /v1/stocks/{symbol}/factor-audit` returns factor-by-factor runtime evidence for `F1` through `F50`.
+2. Endpoint contract parameters:
+    - `forceLive` (boolean): if `true`, backend re-runs on-demand live evaluation before export.
+    - `requireAllLive` (boolean): if `true`, backend returns `409` when any factor is non-live/stubbed; if `false`, payload includes `liveValidation.nonLiveFactors`.
+3. Payload sections:
+    - `scanApiCalls`: live provider call list and output snapshots used by the run.
+    - `scanInputs`: normalized runtime input context used by the factor engine.
+    - `factors[]`: layer mapping (`layer`, `layerRange`), factor identity (`factorCode`, `factorName`), and final decision block (`status`, `triggered`, `vetoed`, `action`, `evaluationStatus`, `stubbed`, `detail`, `metadata`).
+4. Frontend download gating via environment key:
+    - `NEXT_PUBLIC_DOWNLOAD_OUTPUT=true` enables browser auto-download of the audit JSON on stock click.
+    - Missing/invalid values default to disabled (`false`).
+5. Validation/error behavior:
+    - `503` when live evaluation cannot be completed.
+    - `404` when no scan data exists for the symbol.
+    - `409` when `requireAllLive=true` and one or more factors are not in `LIVE` status.
+
+### Implementation Update (2026-08-02): Production API URL + Portfolio Auth Guardrails
+
+Frontend runtime configuration and auth handling were tightened to prevent silent production failures:
+1. `NEXT_PUBLIC_API_URL` is now mandatory in production runtime. The frontend no longer silently defaults to localhost in production when the key is missing.
+2. Missing production API URL now surfaces an explicit configuration error message to the UI call sites instead of returning ambiguous empty lists/404s.
+3. Home dashboard portfolio summary calls are auth-gated: portfolio fetches are skipped when the user is not logged in, returning a clear `Login required for portfolio analytics` state.
+4. Error diagnostics were expanded for:
+    - `/v1/stocks/dual-horizon`
+    - `/v1/portfolio/score`
+    - `/v1/portfolio/optimize`
+    with explicit differentiation for `401/403` authentication issues versus `404` endpoint/base-URL mismatches.
+5. Auth client (`/v1/auth/login`, `/v1/auth/register`, `/v1/auth/refresh`, `/v1/auth/me`) now enforces configured API base URL in production using the same runtime guard as data APIs; auth requests no longer silently fall back to relative frontend paths.
+6. Portfolio UI cards now propagate fetch failures consistently across score, weakest-components, and optimizer-actions panels, avoiding false empty-state messaging when backend/API connectivity fails.
+
+### Implementation Update (2026-08-02): Portfolio DB Outage Transparency + Position Entry Availability
+
+Portfolio and paper-trading UX behavior was tightened for runtime outages where backend routes are healthy but database connectivity is down:
+1. Portfolio client calls now parse backend JSON error payloads and surface explicit DB outage messages when backend returns `Database connection failed` semantics (for `/v1/portfolio/score`, `/v1/portfolio/optimize`, `/v1/positions`, and `POST /v1/positions`).
+2. The portfolio overview no longer hides the `Open Paper Position` form when score fetch fails; users can still see and interact with the position-entry workflow while receiving truthful backend error messages.
+3. Position mutation/read failures now return operation-specific UI errors (`cannot create/load/close positions until DB connectivity is restored`) instead of a generic fetch failure string.
+4. Operational dependency made explicit: paper trading is fully backend-persisted and requires healthy Postgres DNS/network connectivity at runtime.
+5. Backend DB engine now applies Supabase-pooler-safe defaults when host matches `*.pooler.supabase.com`: effective SQLAlchemy pool is capped (`pool_size<=5`, `max_overflow=0`) and SSL is enforced via connect args, reducing `EMAXCONNSESSION` session-limit failures during portfolio operations.
+6. Portfolio page now auto-refreshes authenticated workspace data every 15 seconds while the browser tab is visible, enabling near-live paper-trading score/P&L/positions updates without requiring manual refresh.
+7. Paper-trading entry workflow moved to screener-first UX: users open positions directly from screener stock rows (`+ Paper`) using live row price and selected quantity; portfolio overview now serves analytics/status context rather than manual symbol/price entry.
+8. Backend exception responses now explicitly attach localhost CORS headers for handled error paths (`AppError`, DB connectivity errors, generic 500), preventing browser-side false `No Access-Control-Allow-Origin` blocks when upstream errors occur.
+9. Finnhub analyst action endpoint (`/stock/upgrade-downgrade`) now treats HTTP `401/403` as provider-tier unavailability and degrades to empty analyst-action signal instead of noisy hard-failure propagation.
+10. Backend lifecycle now disposes SQLAlchemy engine on shutdown, and Supabase pooler defaults are capped to low-concurrency mode (`pool_size<=3`, `max_overflow=0`, `ssl=require`) to reduce `EMAXCONNSESSION` pressure.
+11. Asyncpg PgBouncer compatibility: for Supabase pooler hosts, backend runtime and Alembic migration engine disable async prepared statement cache (`statement_cache_size=0`) to prevent `DuplicatePreparedStatementError` in transaction-pool mode.
+
+### Implementation Update (2026-08-02): Option Contract Paper Trading Support
+
+Paper trading position creation was updated to support both underlying stocks and specific Option Contracts:
+1. **Option contract symbol formatting:** The Detail Panel execution card now formats OCC-compliant option symbols (e.g. `NVDA250117C00150000`) for AI target strikes (Call/Put at ~35 DTE).
+2. **Dual-button execution:** Detail Panel surfaces both `+ Paper Stock` (underlying stock at live price) and `+ Paper Option` (option contract at target strike price).
+3. **Portfolio Greeks integration:** When an OCC-formatted option position is created, the backend `portfolio_management_service` parses the symbol root, expiration, call/put type, and strike, automatically computing Black-Scholes **Delta**, **Theta**, and **Vega** for Component 5 (*Options Greek Exposure*) of the Portfolio Score.
+
 ### Multi-User Privacy Isolation (JWT-Scoped)
 
 StockGlass AI now enforces user-scoped privacy boundaries for portfolio and chat data paths:
@@ -752,6 +807,10 @@ Validation rules:
 2. Dedicated portfolio workspace route: `/portfolio`
     Hosts the full paper-trading portfolio management UI: score workspace, optimizer queue, position-entry form, and open-positions table.
 
+Frontend polling policy (implemented):
+1. Visibility-aware background polling refreshes score and open positions on `/portfolio`.
+2. Full optimization payload is loaded via weekly cadence path and served from backend cadence control.
+
 This route split keeps ticker-level discovery and book-level management as separate user workflows.
 
 ### Weighted Score Components
@@ -778,6 +837,17 @@ The optimizer emits a ranked action list with explicit trigger causes, aligned t
 6. Liquidity sweep (`liquidity_score_below_70`) plus option-chain one-day-exit validation (`option_oi_volume_one_day_exit_failed`) using live open interest and volume checks on held OCC contracts.
 7. Macro regime cap (`regime_shift_f45_f49_f50`)
 8. Ranked output (`actions[]` with `priority`, `action`, `trigger`, `reason`, `metrics`)
+
+Cadence and output semantics (implemented):
+1. `cadence=weekly` returns a deterministic cached optimization payload keyed by `(user_id, ISO week)` to avoid recomputation on high-frequency UI refresh.
+2. `cadence=regime_shift` bypasses the weekly cache and executes a fresh optimization pass.
+3. Unknown cadence values are normalized to `weekly`.
+4. Holdings that trigger no rebalance rule are emitted as explicit `HOLD` actions (`trigger=no_rebalance_trigger`) so each open holding has a deterministic optimization classification.
+
+Liquidity scoring semantics (implemented):
+1. Component 6 now blends equity exit-liquidity and held-options liquidity checks directly in score computation.
+2. Option liquidity contributes using open-interest/volume availability and contract-size-vs-OI threshold checks.
+3. Score metrics now include `option_liquid_positions` and `option_illiquid_positions`.
 
 ### Data Sources & Integrity
 1. Positions source: `positions` table (`status=open`) with server-side notional and P&L context.

@@ -1,6 +1,6 @@
 // src/lib/auth.ts
 // Client-side authentication service for StockGlass AI (JWT Access & Refresh Token Management)
-import { API_BASE_URL } from "./config";
+import { API_BASE_URL, API_BASE_URL_ERROR } from "./config";
 
 export interface UserProfile {
   username: string;
@@ -20,6 +20,13 @@ const DEV_API_KEY = "dev_key";
 const ACCESS_TOKEN_KEY = "stockglass_access_token";
 const REFRESH_TOKEN_KEY = "stockglass_refresh_token";
 const USER_PROFILE_KEY = "stockglass_user_profile";
+
+function requireApiBaseUrl(): string {
+  if (API_BASE_URL_ERROR) {
+    throw new Error(API_BASE_URL_ERROR);
+  }
+  return API_BASE_URL;
+}
 
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -64,7 +71,8 @@ export function logout(): void {
 }
 
 export async function loginUser(username: string, password: string): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+  const baseUrl = requireApiBaseUrl();
+  const res = await fetch(`${baseUrl}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -89,7 +97,8 @@ export async function loginUser(username: string, password: string): Promise<Use
 }
 
 export async function registerUser(username: string, password: string): Promise<UserProfile> {
-  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+  const baseUrl = requireApiBaseUrl();
+  const res = await fetch(`${baseUrl}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -120,7 +129,8 @@ export async function refreshAccessToken(): Promise<string | null> {
   }
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const baseUrl = requireApiBaseUrl();
+    const res = await fetch(`${baseUrl}/auth/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: refreshToken }),
@@ -145,8 +155,9 @@ export async function refreshAccessToken(): Promise<string | null> {
 export async function fetchCurrentUser(tokenOverride?: string): Promise<UserProfile> {
   const token = tokenOverride || getAccessToken();
   if (!token) throw new Error("No access token available");
+  const baseUrl = requireApiBaseUrl();
 
-  const res = await fetch(`${API_BASE_URL}/auth/me`, {
+  const res = await fetch(`${baseUrl}/auth/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

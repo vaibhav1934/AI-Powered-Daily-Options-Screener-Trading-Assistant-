@@ -9,6 +9,8 @@ import AuthOverlay from "@/components/auth/AuthOverlay";
 import { PortfolioOptimizationResponse, PortfolioScoreResponse, PositionItem } from "@/types/stockglass";
 import { Activity, ArrowRightLeft, CircleAlert, ShieldCheck } from "lucide-react";
 
+const PORTFOLIO_LIVE_POLL_MS = 15000;
+
 export default function PortfolioPage() {
   const [portfolioScore, setPortfolioScore] = useState<PortfolioScoreResponse | null>(null);
   const [portfolioOptimization, setPortfolioOptimization] = useState<PortfolioOptimizationResponse | null>(null);
@@ -51,9 +53,32 @@ export default function PortfolioPage() {
       setPortfolioOptimization(optimizeRes);
       setPositions(positionsRes.results || []);
     } catch (err: any) {
-      setError(err?.message || "Portfolio workspace unavailable");
+      const rawMessage = err?.message || "Portfolio workspace unavailable";
+      const normalized = String(rawMessage).toLowerCase();
+      if (normalized.includes("failed to fetch")) {
+        setError("Unable to reach portfolio API. Verify NEXT_PUBLIC_API_URL and backend availability.");
+      } else {
+        setError(rawMessage);
+      }
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadPortfolioLiveSlice = useCallback(async () => {
+    if (!isAuthenticated()) {
+      return;
+    }
+
+    try {
+      const [scoreRes, positionsRes] = await Promise.all([
+        fetchPortfolioScore(),
+        fetchPaperPositions("open"),
+      ]);
+      setPortfolioScore(scoreRes);
+      setPositions(positionsRes.results || []);
+    } catch {
+      // Keep current UI state stable during background refresh failures.
     }
   }, []);
 
@@ -81,6 +106,23 @@ export default function PortfolioPage() {
       setPositions([]);
     }
   }, [authed, loadPortfolioWorkspace]);
+
+  useEffect(() => {
+    if (!authed) {
+      return;
+    }
+
+    const tick = () => {
+      if (document.visibilityState === "visible") {
+        void loadPortfolioLiveSlice();
+      }
+    };
+
+    const intervalId = window.setInterval(tick, PORTFOLIO_LIVE_POLL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [authed, loadPortfolioLiveSlice]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -154,6 +196,9 @@ export default function PortfolioPage() {
           >
             Refresh Portfolio
           </button>
+          <div style={{ fontSize: 11, color: "#5f6368" }}>
+            Live refresh every {Math.round(PORTFOLIO_LIVE_POLL_MS / 1000)}s while this tab is active.
+          </div>
         </div>
 
         <div className="portfolio-kpi-grid" style={{ marginBottom: 18 }}>
@@ -220,7 +265,6 @@ export default function PortfolioPage() {
           optimization={portfolioOptimization}
           loading={loading}
           error={error}
-          onRefresh={loadPortfolioWorkspace}
         />
 
         <div className="portfolio-main-grid" style={{ marginTop: 20 }}>

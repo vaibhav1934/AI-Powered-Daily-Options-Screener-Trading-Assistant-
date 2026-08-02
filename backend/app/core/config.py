@@ -16,6 +16,7 @@ import logging
 import os
 from functools import lru_cache
 from typing import Optional
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -180,6 +181,26 @@ class DatabaseConfig(BaseSettings):
     def sanitize_db_url(cls, v: str) -> str:
         """Strip whitespace and accidental trailing newlines from database URL secret."""
         return v.strip() if isinstance(v, str) and v.strip() else "sqlite+aiosqlite:///./stockglass.db"
+
+    @model_validator(mode="after")
+    def validate_supabase_pooler_mode(self) -> "DatabaseConfig":
+        url = (self.database_url or "").strip().lower()
+        if url.startswith("sqlite"):
+            return self
+
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        port = parsed.port
+
+        # Supabase session mode (5432) often hits EMAXCONNSESSION on API workloads.
+        # Force transaction mode configuration early with a clear actionable message.
+        if "pooler.supabase.com" in host and port == 5432:
+            raise ValueError(
+                "DATABASE_URL points to Supabase session pooler (port 5432). "
+                "Use transaction pooler port 6543 with sslmode=require to avoid EMAXCONNSESSION."
+            )
+
+        return self
 
     # Connection pool
     # Moderate defaults to reduce local/API burst starvation while still being tunable via env.

@@ -16,6 +16,9 @@ interface ScreenerRowProps {
   onSelect: (symbol: string) => void;
   watched: boolean;
   onToggleWatch: (symbol: string) => void;
+  paperQty?: number;
+  adding?: boolean;
+  onAddPaperTrade?: (payload: { symbol: string; entryPrice: number; qty: number }) => void;
   isMobile?: boolean;
 }
 
@@ -25,6 +28,9 @@ export function ScreenerRow({
   onSelect,
   watched,
   onToggleWatch,
+  paperQty = 1,
+  adding,
+  onAddPaperTrade,
   isMobile,
 }: ScreenerRowProps) {
   // Use real API fields: chg (dollar change), pct (percent), score (conviction)
@@ -95,7 +101,7 @@ export function ScreenerRow({
               </div>
             </div>
 
-            {/* Right side: Price & Change */}
+            {/* Right side: Price, Change, and quick paper action */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <span style={{ fontSize: 15, color: "#202124", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                 ${item.price > 0 ? item.price.toFixed(2) : "N/A"}
@@ -110,6 +116,27 @@ export function ScreenerRow({
               >
                 {up ? "+" : ""}{item.chg.toFixed(2)} ({item.pct > 0 ? "+" : ""}{item.pct.toFixed(2)}%)
               </span>
+              {onAddPaperTrade ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddPaperTrade({ symbol: item.symbol, entryPrice: item.price, qty: paperQty });
+                  }}
+                  disabled={adding || !(item.price > 0)}
+                  style={{
+                    border: "1px solid #d2e3fc",
+                    background: adding ? "#f1f3f4" : "#e8f0fe",
+                    color: adding ? "#9aa0a6" : "#1a73e8",
+                    borderRadius: 8,
+                    padding: "4px 8px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: adding || !(item.price > 0) ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {adding ? "Adding..." : `+ Paper x${paperQty}`}
+                </button>
+              ) : null}
             </div>
           </div>
         </td>
@@ -215,6 +242,32 @@ export function ScreenerRow({
         >
           {item.score.toFixed(1)}
         </span>
+      </td>
+      <td style={{ padding: "6px 8px", textAlign: "right", width: 110 }}>
+        {onAddPaperTrade ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddPaperTrade({ symbol: item.symbol, entryPrice: item.price, qty: paperQty });
+            }}
+            disabled={adding || !(item.price > 0)}
+            style={{
+              border: "1px solid #d2e3fc",
+              background: adding ? "#f1f3f4" : "#e8f0fe",
+              color: adding ? "#9aa0a6" : "#1a73e8",
+              borderRadius: 8,
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: adding || !(item.price > 0) ? "not-allowed" : "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {adding ? "Adding..." : `+ Paper x${paperQty}`}
+          </button>
+        ) : (
+          <span style={{ fontSize: 11, color: "#9aa0a6" }}>N/A</span>
+        )}
       </td>
     </tr>
   );
