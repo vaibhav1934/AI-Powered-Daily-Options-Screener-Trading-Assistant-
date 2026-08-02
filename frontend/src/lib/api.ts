@@ -1,5 +1,6 @@
 // src/lib/api.ts
 import { API_BASE_URL } from "./config";
+import { authFetch } from "./auth";
 
 export interface ScanResult {
   id: number;
@@ -37,7 +38,7 @@ export async function fetchWatchlist(date?: string): Promise<WatchlistResponse> 
     url.searchParams.append("scan_date", date);
   }
 
-  const res = await fetch(url.toString(), {
+  const res = await authFetch(url.toString(), {
     headers: {
       "Content-Type": "application/json",
       // Include dummy API key if required by backend, since we haven't implemented real auth yet
@@ -54,7 +55,7 @@ export async function fetchWatchlist(date?: string): Promise<WatchlistResponse> 
 }
 
 export async function triggerScan(): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/scans/trigger`, {
+  const res = await authFetch(`${API_BASE_URL}/scans/trigger`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -75,7 +76,7 @@ export async function fetchScorecard(date?: string): Promise<any> {
   }
   const url = new URL(`${API_BASE_URL}/admin/scorecard/${date}`);
 
-  const res = await fetch(url.toString(), {
+  const res = await authFetch(url.toString(), {
     headers: {
       "X-API-Key": "dev_key",
     },
@@ -92,7 +93,7 @@ export async function uploadScreenshot(scanId: number, file: File): Promise<any>
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_BASE_URL}/screenshots/${scanId}`, {
+  const res = await authFetch(`${API_BASE_URL}/screenshots/${scanId}`, {
     method: "POST",
     headers: {
       "X-API-Key": "dev_key",
@@ -107,7 +108,7 @@ export async function uploadScreenshot(scanId: number, file: File): Promise<any>
   const data = await res.json();
   
   // Immediately confirm it to unlock execution details
-  const confirmRes = await fetch(`${API_BASE_URL}/screenshots/${data.id}/confirm`, {
+  const confirmRes = await authFetch(`${API_BASE_URL}/screenshots/${data.id}/confirm`, {
     method: "POST",
     headers: {
       "X-API-Key": "dev_key",
@@ -125,7 +126,7 @@ export async function uploadOptionsChainScreenshot(scanId: number, file: File): 
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_BASE_URL}/screenshots/${scanId}/options-chain`, {
+  const res = await authFetch(`${API_BASE_URL}/screenshots/${scanId}/options-chain`, {
     method: "POST",
     headers: {
       "X-API-Key": "dev_key",
@@ -141,7 +142,7 @@ export async function uploadOptionsChainScreenshot(scanId: number, file: File): 
   const data = await res.json();
   
   // Confirm screenshot to maintain audit trail
-  await fetch(`${API_BASE_URL}/screenshots/${data.id}/confirm`, {
+  await authFetch(`${API_BASE_URL}/screenshots/${data.id}/confirm`, {
     method: "POST",
     headers: {
       "X-API-Key": "dev_key",
@@ -155,7 +156,7 @@ export async function uploadPortfolio(file: File): Promise<any> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`${API_BASE_URL}/portfolio/upload`, {
+  const res = await authFetch(`${API_BASE_URL}/portfolio/upload`, {
     method: "POST",
     headers: {
       "X-API-Key": "dev_key",

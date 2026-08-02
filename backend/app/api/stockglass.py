@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import (
     APIRouter,
@@ -23,11 +23,15 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import require_current_user
 from app.core.exceptions import PositionNotFoundError, StockGlassAuthError
+from app.db.models import User
 from app.db.schemas import (
     DualHorizonListResponseSchema,
     FullFactorBreakdownSchema,
     IndexItemSchema,
+    PortfolioOptimizationResponseSchema,
+    PortfolioScoreResponseSchema,
     PositionCreateSchema,
     PositionItemSchema,
     PositionListResponseSchema,
@@ -37,6 +41,7 @@ from app.db.schemas import (
 )
 from app.db.session import get_db
 from app.services import paper_trading_service, stockglass_service
+from app.services import portfolio_management_service
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +79,10 @@ def verify_token_scope(required_scope: str):
 
 @router.get("/indices", response_model=list[IndexItemSchema])
 async def get_indices(
-    session: AsyncSession = Depends(get_db),
     _token: str = Depends(verify_token_scope("read:screener")),
 ):
     """Get market index strip values (S&P 500, Nasdaq, Dow Jones)."""
-    return await stockglass_service.get_indices(session)
+    return await stockglass_service.get_indices()
 
 
 # --- Section 2: Screener table ---
@@ -159,6 +163,23 @@ async def get_stock_factors(
     return await stockglass_service.get_stock_factors(session, symbol)
 
 
+@router.get("/stocks/{symbol}/factor-audit", response_model=dict[str, Any])
+async def get_stock_factor_audit(
+    symbol: str,
+    force_live: bool = Query(True, alias="forceLive", description="Re-run live scan before producing audit JSON."),
+    require_all_live: bool = Query(False, alias="requireAllLive", description="Fail when any factor is not LIVE/non-stubbed."),
+    session: AsyncSession = Depends(get_db),
+    _token: str = Depends(verify_token_scope("read:screener")),
+):
+    """Get a full audit JSON for all 50 factors including API calls and outputs used in decisions."""
+    return await stockglass_service.get_stock_factor_audit(
+        session=session,
+        symbol=symbol,
+        force_live=force_live,
+        require_all_live=require_all_live,
+    )
+
+
 # --- Section 5: Paper trading ---
 
 
@@ -170,33 +191,90 @@ async def get_stock_factors(
 async def create_position(
     data: PositionCreateSchema,
     session: AsyncSession = Depends(get_db),
-    _token: str = Depends(verify_token_scope("write:trade")),
+    current_user: User = Depends(require_current_user),
 ):
     """Open a new paper trade position with server-side tracking."""
-    return await paper_trading_service.create_position(session, data)
+    return await paper_trading_service.create_position(session, data, current_user.id)
 
 
 @router.get("/positions", response_model=PositionListResponseSchema)
 async def get_positions(
     status_filter: Optional[str] = Query(None, alias="status", description="Filter by 'open' or 'closed'"),
     session: AsyncSession = Depends(get_db),
-    _token: str = Depends(verify_token_scope("read:screener")),
+    current_user: User = Depends(require_current_user),
 ):
     """Get paper trading positions with server-side computed P&L and prices."""
-    return await paper_trading_service.get_positions(session, status_filter)
+    return await paper_trading_service.get_positions(session, current_user.id, status_filter)
 
 
 @router.delete("/positions/{position_id}", response_model=PositionItemSchema)
 async def close_position(
     position_id: str,
     session: AsyncSession = Depends(get_db),
-    _token: str = Depends(verify_token_scope("write:trade")),
+    current_user: User = Depends(require_current_user),
 ):
     """Close an open paper trade position and record realized P&L server-side."""
-    pos = await paper_trading_service.close_position(session, position_id)
+    pos = await paper_trading_service.close_position(session, current_user.id, position_id)
     if not pos:
         raise PositionNotFoundError(position_id)
     return pos
+
+
+@router.get("/portfolio/score", response_model=PortfolioScoreResponseSchema)
+async def get_portfolio_score(
+    w_concentration: Optional[float] = Query(None, ge=0.0),
+    w_risk_adjusted_return: Optional[float] = Query(None, ge=0.0),
+    w_diversification: Optional[float] = Query(None, ge=0.0),
+    w_drawdown: Optional[float] = Query(None, ge=0.0),
+    w_greeks: Optional[float] = Query(None, ge=0.0),
+    w_liquidity: Optional[float] = Query(None, ge=0.0),
+    w_conviction: Optional[float] = Query(None, ge=0.0),
+    w_tax_efficiency: Optional[float] = Query(None, ge=0.0),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_current_user),
+):
+    """Get portfolio health score (0-100 composite) for paper-trading positions."""
+    custom_weights = {
+        "concentration": w_concentration,
+        "risk_adjusted_return": w_risk_adjusted_return,
+        "diversification": w_diversification,
+        "drawdown": w_drawdown,
+        "greeks": w_greeks,
+        "liquidity": w_liquidity,
+        "conviction": w_conviction,
+        "tax_efficiency": w_tax_efficiency,
+    }
+    custom_weights = {k: float(v) for k, v in custom_weights.items() if v is not None}
+    return await portfolio_management_service.get_portfolio_score(session, current_user.id, custom_weights=custom_weights or None)
+
+
+@router.get("/portfolio/optimize", response_model=PortfolioOptimizationResponseSchema)
+async def get_portfolio_optimization(
+    cadence: str = Query("weekly", description="Optimization cadence context: weekly or regime_shift"),
+    w_concentration: Optional[float] = Query(None, ge=0.0),
+    w_risk_adjusted_return: Optional[float] = Query(None, ge=0.0),
+    w_diversification: Optional[float] = Query(None, ge=0.0),
+    w_drawdown: Optional[float] = Query(None, ge=0.0),
+    w_greeks: Optional[float] = Query(None, ge=0.0),
+    w_liquidity: Optional[float] = Query(None, ge=0.0),
+    w_conviction: Optional[float] = Query(None, ge=0.0),
+    w_tax_efficiency: Optional[float] = Query(None, ge=0.0),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_current_user),
+):
+    """Run rules-based portfolio optimization pass and return ranked advisory action list."""
+    custom_weights = {
+        "concentration": w_concentration,
+        "risk_adjusted_return": w_risk_adjusted_return,
+        "diversification": w_diversification,
+        "drawdown": w_drawdown,
+        "greeks": w_greeks,
+        "liquidity": w_liquidity,
+        "conviction": w_conviction,
+        "tax_efficiency": w_tax_efficiency,
+    }
+    custom_weights = {k: float(v) for k, v in custom_weights.items() if v is not None}
+    return await portfolio_management_service.get_portfolio_optimization(session, current_user.id, cadence=cadence, custom_weights=custom_weights or None)
 
 
 # --- Section 7: WebSocket live quote updates ---

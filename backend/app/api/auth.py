@@ -17,20 +17,25 @@ from app.core.exceptions import AuthenticationError
 from app.db.models import User
 from app.db.schemas import (
     LoginRequestSchema,
+    RegisterRequestSchema,
     RefreshTokenRequestSchema,
     TokenResponseSchema,
     UserProfileSchema,
 )
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.services.auth_service import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     InvalidCredentialsError,
     InvalidTokenError,
+    RegistrationValidationError,
     UserNotFoundError,
+    UserAlreadyExistsError,
     authenticate_user,
     create_access_token,
     create_refresh_token,
     get_user_by_username,
+    register_user,
     verify_token,
 )
 
@@ -77,6 +82,29 @@ async def login(
     refresh_token = create_refresh_token({"sub": user.username})
 
     logger.info("Trader '%s' authenticated successfully", user.username)
+    return TokenResponseSchema(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+@router.post("/register", response_model=TokenResponseSchema, status_code=status.HTTP_201_CREATED)
+async def register(
+    payload: RegisterRequestSchema,
+    session: AsyncSession = Depends(get_db),
+) -> TokenResponseSchema:
+    """Public self-registration endpoint for multi-user access."""
+    settings = get_settings()
+    if not settings.app.public_registration_enabled:
+        raise RegistrationValidationError("Public registration is currently disabled.")
+
+    user = await register_user(session, payload.username, payload.password)
+    access_token = create_access_token({"sub": user.username})
+    refresh_token = create_refresh_token({"sub": user.username})
+
+    logger.info("Trader '%s' registered successfully", user.username)
     return TokenResponseSchema(
         access_token=access_token,
         refresh_token=refresh_token,

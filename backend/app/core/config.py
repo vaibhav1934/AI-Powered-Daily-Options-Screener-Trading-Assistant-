@@ -140,6 +140,9 @@ class MarketDataConfig(BaseSettings):
     # Alpha Vantage — technicals (25 calls/day free tier, binding constraint)
     alpha_vantage_api_key: str = Field(default="")
 
+    # FRED — macro/rates series (free official API)
+    fred_api_key: str = Field(default="")
+
     # Cache TTLs (seconds)
     cache_ttl_finnhub: int = Field(default=300, description="Finnhub cache TTL in seconds")
     cache_ttl_alpha_vantage: int = Field(
@@ -179,9 +182,11 @@ class DatabaseConfig(BaseSettings):
         return v.strip() if isinstance(v, str) and v.strip() else "sqlite+aiosqlite:///./stockglass.db"
 
     # Connection pool
-    pool_size: int = Field(default=10)
-    pool_max_overflow: int = Field(default=20)
+    # Moderate defaults to reduce local/API burst starvation while still being tunable via env.
+    pool_size: int = Field(default=8)
+    pool_max_overflow: int = Field(default=8)
     pool_recycle: int = Field(default=3600)
+    pool_timeout: int = Field(default=45)
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +216,24 @@ class AppConfig(BaseSettings):
     scan_schedule_hour: int = Field(default=6)
     scan_schedule_minute: int = Field(default=30)
 
+    # Portfolio maintenance schedule (CST)
+    portfolio_scheduler_enabled: bool = Field(default=True)
+    portfolio_daily_score_hour: int = Field(default=18)
+    portfolio_daily_score_minute: int = Field(default=5)
+    portfolio_weekly_optimize_day_of_week: str = Field(default="sun")
+    portfolio_weekly_optimize_hour: int = Field(default=18)
+    portfolio_weekly_optimize_minute: int = Field(default=15)
+
+    # Default portfolio score weights (must sum to 1.0)
+    portfolio_weight_concentration: float = Field(default=0.15)
+    portfolio_weight_risk_adjusted_return: float = Field(default=0.15)
+    portfolio_weight_diversification: float = Field(default=0.12)
+    portfolio_weight_drawdown: float = Field(default=0.12)
+    portfolio_weight_greeks: float = Field(default=0.12)
+    portfolio_weight_liquidity: float = Field(default=0.10)
+    portfolio_weight_conviction: float = Field(default=0.12)
+    portfolio_weight_tax_efficiency: float = Field(default=0.12)
+
     # Cutoff times (CST) — framework rules
     cutoff_standard: str = Field(default="11:00")
     cutoff_friday: str = Field(default="10:30")
@@ -218,6 +241,55 @@ class AppConfig(BaseSettings):
 
     # API auth (simple key for single-user v1)
     api_secret_key: str = Field(default="change-me-in-production")
+    public_registration_enabled: bool = Field(default=True)
+
+    @model_validator(mode="after")
+    def validate_portfolio_settings(self) -> "AppConfig":
+        for field_name in (
+            "portfolio_daily_score_hour",
+            "portfolio_weekly_optimize_hour",
+        ):
+            value = int(getattr(self, field_name))
+            if value < 0 or value > 23:
+                raise ValueError(f"{field_name} must be in range 0..23")
+
+        for field_name in (
+            "portfolio_daily_score_minute",
+            "portfolio_weekly_optimize_minute",
+        ):
+            value = int(getattr(self, field_name))
+            if value < 0 or value > 59:
+                raise ValueError(f"{field_name} must be in range 0..59")
+
+        allowed_days = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+        if self.portfolio_weekly_optimize_day_of_week.lower() not in allowed_days:
+            raise ValueError("portfolio_weekly_optimize_day_of_week must be one of mon,tue,wed,thu,fri,sat,sun")
+
+        weights = [
+            float(self.portfolio_weight_concentration),
+            float(self.portfolio_weight_risk_adjusted_return),
+            float(self.portfolio_weight_diversification),
+            float(self.portfolio_weight_drawdown),
+            float(self.portfolio_weight_greeks),
+            float(self.portfolio_weight_liquidity),
+            float(self.portfolio_weight_conviction),
+            float(self.portfolio_weight_tax_efficiency),
+        ]
+
+        if any(w < 0 for w in weights):
+            raise ValueError("Portfolio weights cannot be negative")
+
+        total = sum(weights)
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(f"Portfolio weights must sum to 1.0, got {total:.6f}")
+
+        secret = (self.api_secret_key or "").strip()
+        if not secret or secret == "change-me-in-production":
+            logger.warning("JWT secret key is using a default/placeholder value. Set APP_API_SECRET_KEY to a random >=32-byte secret.")
+        elif len(secret.encode("utf-8")) < 32:
+            logger.warning("JWT secret key is shorter than 32 bytes; use a longer secret to avoid weak HMAC key warnings.")
+
+        return self
 
 
 # ---------------------------------------------------------------------------

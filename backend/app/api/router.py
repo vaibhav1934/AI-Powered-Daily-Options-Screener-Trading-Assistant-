@@ -7,7 +7,7 @@ Aggregates all API route modules into a single router.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from app.core.security import verify_api_key
+from app.core.security import verify_authenticated_or_api_key
 
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
@@ -21,7 +21,7 @@ from app.api.watchlist import router as watchlist_router
 
 api_router = APIRouter(prefix="/v1")
 root_api_router = APIRouter()
-internal_router = APIRouter(dependencies=[Depends(verify_api_key)])
+internal_router = APIRouter(dependencies=[Depends(verify_authenticated_or_api_key)])
 
 internal_router.include_router(scans_router)
 internal_router.include_router(debug_router)

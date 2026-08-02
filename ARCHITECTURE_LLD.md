@@ -10,6 +10,27 @@ StockGlass AI is a screening-grade trading assistant built on a **10-Layer / 50-
 1. **Zero Mock / Fallback Data:** If live market data or database scans are unavailable, endpoints return error states (`503/404`) or empty structures (`[]` / `0.0`) rather than generating simulated numbers.
 2. **Zero Buy/Sell Advisory Language:** All user-facing explanations synthesized by the LLM must pass a strict rules-based compliance filter that prohibits direct trading advice.
 
+### Implementation Update (2026-08-02): Missing Factor Inputs Wired
+
+The scan pipeline now forwards the following previously-missing fields directly into `ScanContext` for factor evaluation:
+1. **Earnings fields** (`eps_estimate`, `eps_actual`, `revenue_estimate`, `revenue_actual`, `is_after_hours_beat`) from Finnhub earnings calendar entries.
+2. **Earnings window field** (`earnings_within_window`) computed from report date proximity (`0..5` days).
+3. **Gap structure fields** (`gap_present`, `gap_hold_valid`) computed from live daily bars (today open vs previous close) plus current-price hold validation.
+4. **Analyst action fields** (`analyst_rating_change`, `analyst_firm_tier`) from Finnhub upgrade/downgrade actions with conservative tier classification.
+5. **EDGAR filing fields** (`near_ath_proximity`, `edgar_check_status`, `has_recent_shelf_filing`, `shelf_filing_date`, `shelf_form_type`) now enriched during main batch scan for near-ATH names instead of only lazy detail evaluation.
+6. **Ecosystem proxy field** (`ecosystem_partner_10pct_move`) now populated from same-sector +10% mover cohort detection in the active scan set.
+
+Residual limitation:
+1. Ecosystem relationship quality remains a free-data proxy (sector-cohort based) and is not yet a true supply-chain graph.
+
+### Multi-User Privacy Isolation (JWT-Scoped)
+
+StockGlass AI now enforces user-scoped privacy boundaries for portfolio and chat data paths:
+1. **Portfolio isolation:** All paper-trading positions and derived portfolio analytics are scoped by authenticated user identity (`users.id`).
+2. **Chat isolation:** GenAI conversation memory is namespaced by authenticated user identity and conversation id, preventing cross-user history leakage.
+3. **JWT-required privacy routes:** Privacy-sensitive routes (`/v1/positions*`, `/v1/portfolio/score`, `/v1/portfolio/optimize`, `/v1/chat*`) require bearer-authenticated users and do not permit API-key-only access.
+4. **Legacy unowned positions:** Pre-migration rows without ownership are excluded from user-scoped reads and do not appear in any authenticated user's portfolio views.
+
 ### High-Level System Architecture
 
 ```mermaid
@@ -506,9 +527,12 @@ The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sl
 * **API_SECRET_KEY must be set in HF Secrets:** The frontend sends `X-API-Key: dev_key` on every request. The backend validates this against `API_SECRET_KEY` from environment. If missing, the backend falls back to `"change-me-in-production"` which causes 401 errors.
 * **Trailing newlines in HF secrets:** Pasting secrets manually in the HF UI often appends `\n`. The `DATABASE_URL` field validator in `config.py` strips these automatically using `@field_validator`.
 * **`/chat` POST trailing slash:** FastAPI's trailing-slash redirect (307) on `POST /chat/` converts POST to GET, breaking the SSE stream. Both `@router.post("")` and `@router.post("/")` are registered to prevent this.
+* **Multi-user auth model:** The app now supports public self-registration via `POST /v1/auth/register`, followed by JWT access/refresh token usage for authenticated app access. Existing API-key access remains available as a compatibility/admin path.
 * **Versioned API namespace:** All production REST endpoints are exposed under `/v1/...` only.
     Root fallback aliases (such as `/stocks`, `/chat`, `/watchlist`, `/debug`, `/auth`) are intentionally disabled to enforce a single stable contract.
-* **CORS:** `allow_origin_regex` covers `*.vercel.app` and `*.hf.space` wildcard domains for all preview and production deployments.
+* **CORS:** `allow_origin_regex` covers `*.vercel.app` and `*.hf.space` wildcard domains, plus local development origins `http://localhost(:port)` and `http://127.0.0.1(:port)`.
+* **Long-term fundamentals sourcing:** The long-term dual-horizon model now merges SEC EDGAR Company Facts (`/api/xbrl/companyfacts/CIK...json`) with market-data fundamentals. Accounting fields (including `interest_coverage`) are filled from SEC XBRL when market provider fields are null, while valuation fields (`trailing_pe`, `forward_pe`, `peg_ratio`) remain market-provider sourced.
+* **Pre-scoring market-cap gate:** Candidate eligibility now enforces `market_cap_usd >= 1,000,000,000` before entering the 50-factor / 10-layer engine. This gate is applied in both batch scan ingestion and on-demand single-ticker evaluation paths. Inputs support numeric caps and `T/B/M` suffixed strings via deterministic parsing, and filtered counts are surfaced in scan trigger responses as `tickers_filtered_market_cap`.
 
 ### Required Hugging Face Secrets
 | Secret Name | Value | Required? |
@@ -518,6 +542,7 @@ The backend is hosted on **Hugging Face Spaces free tier (CPU basic)**, which sl
 | `GEMINI_API_KEY` | Google Gemini API key | ✅ For GenAI features |
 | `FINNHUB_API_KEY` | Finnhub API key | ✅ For market data |
 | `ALPHA_VANTAGE_API_KEY` | Alpha Vantage key | ✅ For technicals |
+| `FRED_API_KEY` | FRED API key | Recommended for official keyed macro/rates access |
 
 ---
 
@@ -571,8 +596,10 @@ This design prevents short-term catalyst positioning from contaminating long-ter
 |---|---|
 | `backend/app/framework/dual_horizon.py` | Added tactical and long-term evaluators and output contract builders |
 | `backend/app/services/fundamentals_service.py` | Added live fundamentals ingestion (`yfinance`) for long-term engine inputs |
-| `backend/app/framework/factors/base.py` | Extended `ScanContext` with typed fundamentals fields |
-| `backend/app/framework/engine.py` | Mapped fundamentals fields from ticker payload into `ScanContext` |
+| `backend/app/framework/factors/base.py` | Extended `ScanContext` with typed fundamentals fields plus tactical enrichment fields (`mtf_trend_aligned`, `relative_volume`, catalyst booleans, options mechanics metrics) |
+| `backend/app/framework/engine.py` | Mapped enriched tactical + long-term fields from ticker payload into `ScanContext` |
+| `backend/app/core/market_data/technicals.py` | Added live 60m trend-alignment check and relative-volume computation from real bars |
+| `backend/app/services/options_service.py` | Added live options mechanics metrics (`iv_rank_1y`, `iv_crush_risk`, `put_call_oi_ratio`, `skew_signal`) to selected contract payload |
 | `backend/app/services/scan_service.py` | Persisted dual-horizon payload into `daily_scans.factor_results_json.dual_horizon` |
 | `backend/app/services/stockglass_service.py` | Exposed dual-horizon payload in stock list/detail and built dedicated dual-list response |
 | `backend/app/api/stockglass.py` | Added route: `GET /v1/stocks/dual-horizon` |
@@ -645,8 +672,157 @@ Response model: `DualHorizonListResponseSchema`
 3. **Regime hard gate:** Tactical candidates with triggered `F45`, `F49`, `F50`, or post-cutoff state fail regime gate and are excluded from tactical list output.
 4. **Legacy list compatibility:** `daily_scans.list_type` remains populated for compatibility; dual-horizon list consumption should use `GET /v1/stocks/dual-horizon` as source of truth.
 
+### Tactical Enrichment Update (2026-08-02)
+1. **Catalyst expansion:** Tactical scoring now ingests additional live catalyst classes from ticker/general news parsing: analyst day, product launch, FDA/regulatory events, index reconstitution, and sector macro events (including OPEC or macro data print context).
+2. **Technical setup expansion:** Tactical scoring now uses multi-timeframe alignment (daily trend plus 60m trend check) and relative-volume confirmation sourced from real bars.
+3. **Options mechanics expansion:** Tactical scoring now uses live options mechanics signals from selected chain data: IV rank proxy, IV crush risk tier, put/call OI ratio, and skew classification.
+4. **API output extension:** `dualFramework.tactical` now includes `catalyst_signals`, `technical_signals`, `options_signals`, `entry_cutoff`, `binary_event_exit`, and `invalidation_rule` in stock detail responses.
+
+### Long-Term Completion Update (2026-08-02)
+1. **Long-term layer expansion:** The long-term evaluator now emits additional structured outputs for remaining framework sections:
+    - `moat_signals` (quality/moat proxies from margin and return profile)
+    - `secular_signals` (structural growth and sector-tailwind mapping)
+    - `management_signals` (ownership/capital discipline signals)
+    - `target_valuation_band` (forward-PE valuation band output)
+2. **Portfolio-fit integration:** Portfolio-fit now consumes real open-position exposure by sector from `positions` + `stocks`, and applies exposure-aware scoring without synthetic state.
+3. **Thesis-change flagging:** Long-term payload now emits `thesis_change_event_detected` based on live fundamentals deterioration conditions (negative growth/margin pressure/leverage stress).
+4. **Cadence automation:** Stock detail read path enforces long-term refresh logic:
+    - monthly refresh when persisted scan month differs from current month;
+    - immediate refresh when `thesis_change_event_detected=true` in the last persisted long-term payload.
+5. **Extended API contract:** `dualFramework.long_term` now includes `target_valuation_band`, `moat_signals`, `secular_signals`, `management_signals`, `thesis_change_event_detected`, and `thesis_break_condition`.
+
 ### Routing Note (2026-08-01)
 `/v1/scans/trigger` is the canonical and only supported scan trigger route.
 The root alias `/scans/trigger` was removed to prevent duplicate endpoint exposure.
+
+### 50-Factor Compliance Status (2026-08-02)
+1. **Canonical mapping enforced:** Factor IDs `F01..F39` are now mapped to the user-defined 10-layer taxonomy labels (macro → global structure → earnings/catalyst → sector/correlation → technical → options mechanics → liquidity/microstructure → sentiment/positioning).
+2. **Truthful implementation signaling:** Any factor whose required live inputs are not yet wired returns `status=UNCONFIGURED` with `stubbed=true` at evaluation time. These factors are included in audit output and are never silently treated as implemented.
+3. **Core live coverage retained:** `F40..F50` remain dedicated live rule implementations.
+4. **Coverage contract:** Scan responses continue exposing factor coverage (`total`, `live_count`, `stubbed_count`, IDs) so implementation gaps are visible. Current measured state: `total=50`, `live_count=43`, `stubbed_count=7`.
+5. **EDGAR enforcement tightened:** `F46` now fails closed when EDGAR availability checks fail. If SEC check is unavailable, entry is vetoed instead of passing.
+6. **Free public-source expansion:** The following spec factors are now backed by free public data and wired live into scan evaluation:
+    - `F03` via free dollar-index history (`DX-Y.NYB`)
+    - `F04` via free FRED Treasury yield series (`DGS2`, `DGS10`)
+    - `F05` via free ETF/volatility series (`HYG`, `LQD`, `GLD`, `^VIX`)
+    - `F09` via free overnight futures intraday history (`ES=F`)
+    - `F07` via free European index history (`^GDAXI`, `^FTSE`)
+    - `F10` via free VIX term proxies (`^VIX`, `^VIX9D`, `^VIX3M`)
+    - `F16`, `F18`, `F19` via free ticker/sector/SPX history and sector ETF mapping
+    - `F23` via free intraday volume-profile node calculation from `yfinance` bars
+    - `F28`, `F29` via free option-chain Greeks estimated from `yfinance` chain data
+    - `F37` via free short-interest fields exposed in `yfinance` fundamentals (`shortRatio`, `shortPercentOfFloat`)
+    - `F01` via free Fed-path proxy synthesized from FRED rates/curve + DXY/VIX context (`fed_policy_prob_proxy`)
+    - `F08` via free central-bank surprise proxy from live macro-news keyword scoring (`central_bank_surprise_proxy`)
+    - `F12` via free whisper proxy from pre-earnings options crowding + analyst/reaction sentiment (`whisper_eps_gap_proxy`)
+    - `F13` via free guidance-trend proxy from quarterly earnings surprise trajectory (`guidance_revision_trend_4q`)
+    - `F33` via free options activity proxy (`option_volume_oi_ratio = selected_contract_volume / selected_contract_oi`)
+    - `F35` via free dealer-gamma regime proxy inferred from put/call OI ratio + IV rank + skew (`dealer_gamma_regime_proxy`)
+    - `F38` via free retail sentiment proxy from ticker news tone scoring (`retail_sentiment_score`)
+7. **Proxy transparency contract:** For these factors, outputs include `metadata.source_tier="FREE_PROXY"` to make non-institutional quality explicit in audit logs.
+
+### Remaining Gaps to Reach Full 1:1 Spec Parity
+1. **Data-source parity gaps:** `F01`, `F08`, `F12`, `F13`, `F33`, `F35`, and `F38` are now live via free proxies, but still require institutional datasets for strict parity (FedWatch probabilities, structured central-bank surprise feeds, whisper/guidance databases, full historical options-flow panels, dealer positioning models, and dedicated retail-flow datasets).
+2. **Execution-policy parity gaps:** Some non-factor risk policies (for example explicit no-averaging-down enforcement and 25% FOMC-week cap as hard execution controls) are documented but not yet fully enforced as server-side order-policy gates.
+3. **No-skip interpretation:** `F11` is implemented as earnings-presence detection at ticker level; strict "every name no skip" guarantees still depend on upstream universe ingestion/scheduling and operational availability.
+
+---
+
+## 14. Portfolio Scoring & Optimization (Paper Trading)
+
+### Objective
+Provide deterministic, auditable portfolio management outputs for paper-trading positions:
+1. **Portfolio Score (0-100 composite)** from weighted component scores.
+2. **Portfolio Optimization Advisory** with ranked, trigger-linked actions.
+
+### API Routes
+1. `GET /v1/portfolio/score`
+2. `GET /v1/portfolio/optimize?cadence=weekly|regime_shift`
+
+Both endpoints also support optional per-request weight overrides via query params:
+`w_concentration`, `w_risk_adjusted_return`, `w_diversification`, `w_drawdown`, `w_greeks`, `w_liquidity`, `w_conviction`, `w_tax_efficiency`.
+Validation rules:
+1. Every provided weight must be non-negative.
+2. Effective full weight set must sum exactly to 1.0.
+3. Invalid sets fail fast with explicit error.
+
+### Frontend Routing
+1. Main screener route: `/`
+    Displays only a compact portfolio summary strip (composite score, top watch items, CTA).
+2. Dedicated portfolio workspace route: `/portfolio`
+    Hosts the full paper-trading portfolio management UI: score workspace, optimizer queue, position-entry form, and open-positions table.
+
+This route split keeps ticker-level discovery and book-level management as separate user workflows.
+
+### Weighted Score Components
+1. Concentration Risk — 15%
+2. Risk-Adjusted Return — 15%
+3. Diversification/Correlation — 12%
+4. Drawdown Exposure — 12%
+5. Options Greek Exposure — 12%
+6. Liquidity Score — 10%
+7. Conviction Alignment — 12%
+8. Tax Efficiency — 12%
+
+Final score is the weighted blend of available component scores. If a component cannot be computed from available live/runtime data, it is surfaced as `DATA_NOT_AVAILABLE` and listed in `missingComponents`.
+
+Default weights are runtime-configurable through app settings (`AppConfig`), and can be overridden per call on the portfolio scoring/optimization endpoints.
+
+### Optimization Pass (Advisory-Only)
+The optimizer emits a ranked action list with explicit trigger causes, aligned to these deterministic steps:
+1. Concentration rebalance (`single_name_over_10pct`, `sector_over_30pct`)
+2. Correlation de-clustering (`top5_avg_corr_gt_0_75`) plus concrete replacement generation (`uncorrelated_replacement_candidate`) from the latest scan universe, excluding current holdings and dominant-sector crowding.
+3. Tax-loss harvest (`loss_gt_30d_no_near_catalyst`) with explicit near-term catalyst gate from dual-horizon tactical payload.
+4. Greek rebalance (`greek_band_exceeded`)
+5. Conviction sizing correction (`position_weight_vs_conviction_cap`)
+6. Liquidity sweep (`liquidity_score_below_70`) plus option-chain one-day-exit validation (`option_oi_volume_one_day_exit_failed`) using live open interest and volume checks on held OCC contracts.
+7. Macro regime cap (`regime_shift_f45_f49_f50`)
+8. Ranked output (`actions[]` with `priority`, `action`, `trigger`, `reason`, `metrics`)
+
+### Data Sources & Integrity
+1. Positions source: `positions` table (`status=open`) with server-side notional and P&L context.
+2. Market prices: live quotes via Finnhub for current pricing.
+3. Return/correlation/drawdown series: yfinance daily close history.
+4. Conviction alignment: latest scan conviction context from `daily_scans.factor_results_json.dual_horizon`.
+5. Macro override: latest factor triggers (`F45`, `F49`, `F50`) from `factor_logs`.
+
+### Error Handling
+1. If no open positions exist, score returns `DATA_NOT_AVAILABLE` with `missingComponents=["No open positions"]`.
+2. If required live quote data is missing for held symbols, scoring fails explicitly rather than fabricating values.
+3. Optimization remains advisory-only and never auto-executes trades.
+
+### Scheduled Execution Policy
+Portfolio maintenance jobs are scheduled server-side (CST timezone):
+1. Daily scoring run (all active users) at configured `portfolio_daily_score_hour` / `portfolio_daily_score_minute`.
+2. Weekly optimization run (all active users, cadence=`weekly`) at configured `portfolio_weekly_optimize_day_of_week`, `portfolio_weekly_optimize_hour`, and `portfolio_weekly_optimize_minute`.
+3. Scheduler can be disabled with `portfolio_scheduler_enabled=false`.
+4. Job execution is deterministic, logs per-user failures, and never auto-executes trades.
+
+---
+
+## 15. Multi-User Registration & Session Access (2026-08-02)
+
+### Objective
+Evolve the app from a single hardcoded developer user path into a real multi-user flow where end users can register, log in, and use the application with JWT-backed sessions.
+
+### Auth Routes
+1. `POST /v1/auth/register`
+2. `POST /v1/auth/login`
+3. `POST /v1/auth/refresh`
+4. `GET /v1/auth/me`
+
+### Session Model
+1. Registration issues an access token and refresh token immediately on success.
+2. Frontend stores JWT session tokens locally and uses Bearer authentication for protected app requests.
+3. API-key access remains supported as a compatibility path for local development/admin automation.
+
+### Protected Route Behavior
+1. StockGlass contract routes already accept Bearer token or API key.
+2. Internal authenticated routes now also accept Bearer token or API key, enabling registered users to access scans, uploads, watchlists, chat, and portfolio workflows without the single shared API-key path.
+
+### Frontend UX
+1. The login modal now supports both `Log In` and `Register` modes.
+2. Registration validates password confirmation client-side before attempting account creation.
+3. After registration, the user is automatically treated as logged in and the app continues under the issued JWT session.
 
 

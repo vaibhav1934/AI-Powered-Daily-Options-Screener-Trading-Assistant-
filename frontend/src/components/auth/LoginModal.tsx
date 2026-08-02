@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { loginUser, UserProfile } from "@/lib/auth";
+import { loginUser, registerUser, UserProfile } from "@/lib/auth";
 import { Lock, AlertCircle, Loader2 } from "lucide-react";
 
 interface LoginModalProps {
@@ -15,10 +15,13 @@ interface LoginModalProps {
 export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+  const isRegister = mode === "register";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,16 +29,28 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
       setError("Please enter both username and password.");
       return;
     }
+    if (mode === "register") {
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters long.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const user = await loginUser(username.trim(), password);
+      const user = mode === "login"
+        ? await loginUser(username.trim(), password)
+        : await registerUser(username.trim(), password);
       onSuccess(user);
       onClose();
     } catch (err: any) {
-      setError(err.message || "Login failed. Please check your credentials.");
+      setError(err.message || (mode === "login" ? "Login failed. Please check your credentials." : "Registration failed. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -43,6 +58,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
 
   return (
     <div
+      className="auth-modal-overlay"
       style={{
         position: "fixed",
         inset: 0,
@@ -57,13 +73,13 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
       onClick={onClose}
     >
       <div
+        className="auth-modal-card"
         style={{
           position: "relative",
           width: "100%",
           maxWidth: 420,
           background: "#ffffff",
           borderRadius: 16,
-          padding: 32,
           boxShadow: "0 24px 48px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(26, 115, 232, 0.12)",
           border: "1px solid #e8eaed",
           display: "flex",
@@ -72,6 +88,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="auth-modal-scroll" style={{ width: "100%", boxSizing: "border-box" }}>
         {/* Brand Icon Header */}
         <div
           style={{
@@ -92,34 +109,55 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
         </div>
 
         <h2 style={{ fontSize: 20, fontWeight: 700, color: "#202124", margin: 0, letterSpacing: -0.3 }}>
-          Institutional Access
+          {mode === "login" ? "Welcome Back" : "Create Your Account"}
         </h2>
         <p style={{ fontSize: 13, color: "#5f6368", textAlign: "center", margin: "6px 0 24px", lineHeight: 1.4 }}>
-          Log in with your administrator or trader credentials to unlock deep-dive screener analytics and AI assistant.
+          {mode === "login"
+            ? "Sign in to access your screener and portfolio workspace."
+            : "Create an account to start using StockGlass AI."}
         </p>
 
-        {error && (
-          <div
-            style={{
-              width: "100%",
-              background: "#fce8e6",
-              border: "1px solid #fad2cf",
-              color: "#c5221f",
-              padding: "10px 14px",
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 20,
-              boxSizing: "border-box",
-            }}
+        <div style={{ width: "100%", display: "flex", gap: 8, marginBottom: 20, background: "#f1f3f4", padding: 4, borderRadius: 12 }}>
+          <button
+            type="button"
+            onClick={() => { setMode("login"); setError(null); }}
+            style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: "none", background: mode === "login" ? "#fff" : "transparent", color: mode === "login" ? "#1a73e8" : "#5f6368", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
-            <span>{error}</span>
-          </div>
-        )}
+            Log In
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode("register"); setError(null); }}
+            style={{ flex: 1, padding: "8px 12px", borderRadius: 10, border: "none", background: mode === "register" ? "#fff" : "transparent", color: mode === "register" ? "#1a73e8" : "#5f6368", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            Register
+          </button>
+        </div>
+
+        <div style={{ width: "100%", marginBottom: error ? 20 : 0 }}>
+          {error ? (
+            <div
+              style={{
+                width: "100%",
+                background: "#fce8e6",
+                border: "1px solid #fad2cf",
+                color: "#c5221f",
+                padding: "10px 14px",
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                boxSizing: "border-box",
+                marginBottom: 20,
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          ) : null}
+        </div>
 
         <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
@@ -141,7 +179,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. admin or trader"
+              placeholder="e.g. trader_jane"
               disabled={loading}
               autoFocus
               style={{
@@ -215,6 +253,44 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
             />
           </div>
 
+          {isRegister ? (
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#5f6368",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.6,
+                  marginBottom: 6,
+                }}
+              >
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••••••"
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #e8eaed",
+                  background: "#f8f9fa",
+                  fontSize: 14,
+                  color: "#202124",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  transition: "all 0.15s ease",
+                }}
+              />
+            </div>
+          ) : null}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
             <button
               type="submit"
@@ -241,10 +317,10 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
               {loading ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Authenticating...</span>
+                  <span>{mode === "login" ? "Authenticating..." : "Creating account..."}</span>
                 </>
               ) : (
-                <span>Log In to StockGlass Pro</span>
+                <span>{mode === "login" ? "Log In to StockGlass Pro" : "Create StockGlass Account"}</span>
               )}
             </button>
 
@@ -280,8 +356,9 @@ export default function LoginModal({ isOpen, onClose, onSuccess }: LoginModalPro
 
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #e8eaed", width: "100%", textAlign: "center" }}>
           <p style={{ fontSize: 11, color: "#70757a", margin: 0 }}>
-            🔒 Secure institutional JWT session. Zero public registration.
+            Secure JWT session with encrypted password verification.
           </p>
+        </div>
         </div>
       </div>
     </div>

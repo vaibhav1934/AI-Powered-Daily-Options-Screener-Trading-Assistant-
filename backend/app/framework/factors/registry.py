@@ -23,7 +23,7 @@ from app.framework.factors.f47_pre_earnings_exit import F47PreEarningsBinaryExit
 from app.framework.factors.f48_gap_hold_protocol import F48GapHoldProtocol
 from app.framework.factors.f49_boj_kospi_rule import F49BOJKOSPIRule
 from app.framework.factors.f50_war_tape_rule import F50WarTapeRule
-from app.framework.factors.f1_to_f39_generic import build_f1_to_f39
+from app.framework.factors.f1_to_f39_spec import build_f1_to_f39
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,8 @@ class FactorRegistry:
     """
     Central registry of all 50 factors (F1–F50).
     F40–F50: live implementations with real trigger/action logic.
-    F1–F39: explicit stubs with status UNCONFIGURED.
+    F1–F39: framework-aligned definitions. Factors without wired inputs are
+    explicitly marked UNCONFIGURED at evaluation time.
 
     Provides introspection methods to query live vs. stubbed factors.
     """
@@ -43,7 +44,7 @@ class FactorRegistry:
 
     def _register_all(self) -> None:
         """Register all 50 factors."""
-        # F1–F39: Generic implementations
+        # F1–F39: Framework-aligned definitions
         for factor in build_f1_to_f39():
             self._factors[factor.factor_id] = factor
 

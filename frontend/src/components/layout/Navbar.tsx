@@ -1,27 +1,34 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Search, Bell, Sparkles, MessageSquare, BarChart2, Lock, LogOut, User as UserIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Search, Bell, Sparkles, BarChart2, Lock, LogOut, User as UserIcon, BriefcaseBusiness } from "lucide-react";
 import { isAuthenticated, getStoredUser, logout, UserProfile } from "@/lib/auth";
 import LoginModal from "@/components/auth/LoginModal";
 
 interface NavbarProps {
-  query: string;
-  onQueryChange: (q: string) => void;
-  rightPanelMode: "detail" | "ai_chat";
-  onRightPanelModeChange: (mode: "detail" | "ai_chat") => void;
+  query?: string;
+  onQueryChange?: (q: string) => void;
+  rightPanelMode?: "detail" | "ai_chat";
+  onRightPanelModeChange?: (mode: "detail" | "ai_chat") => void;
   isMobile?: boolean;
+  showSearch?: boolean;
+  showPanelToggle?: boolean;
 }
 
 export function Navbar({
-  query,
+  query = "",
   onQueryChange,
-  rightPanelMode,
+  rightPanelMode = "detail",
   onRightPanelModeChange,
   isMobile,
+  showSearch = true,
+  showPanelToggle = true,
 }: NavbarProps) {
   const [authed, setAuthed] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const pathname = usePathname();
 
   const checkAuth = () => {
     const isAuth = isAuthenticated();
@@ -48,34 +55,77 @@ export function Navbar({
 
   return (
     <>
-      <div style={{ borderBottom: "1px solid #e8eaed", padding: isMobile ? "8px 16px" : "8px 24px", display: "flex", alignItems: "center", gap: isMobile ? 12 : 24, background: "#fff", flexShrink: 0 }}>
+      <div className="navbar-shell" style={{ borderBottom: "1px solid #e8eaed", padding: isMobile ? "8px 16px" : "8px 24px", gap: isMobile ? 12 : 24, background: "#fff", flexShrink: 0 }}>
         <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 400, color: "#5f6368", letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 4 }}>
           <span><span style={{ color: "#1a73e8", fontWeight: 500 }}>Stock</span>{isMobile ? "" : "Glass AI"}</span>
           <span style={{ fontSize: 10, background: "#e8f0fe", color: "#1a73e8", padding: "2px 6px", borderRadius: 10, fontWeight: 600, marginLeft: 6 }}>PRO</span>
         </div>
 
-        <div style={{ flex: 1, maxWidth: 480, position: "relative" }}>
-          <Search size={16} color="#5f6368" style={{ position: "absolute", left: 12, top: 8 }} />
-          <input
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder={isMobile ? "Search..." : "Search stocks in your lists..."}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: isMobile ? 0 : 220, flexWrap: "wrap" }}>
+          <Link
+            href="/"
             style={{
-              width: "100%",
-              padding: "6px 12px 6px 36px",
-              borderRadius: 24,
-              border: "1px solid #e8eaed",
-              background: "#f1f3f4",
-              fontSize: 14,
-              outline: "none",
-              boxSizing: "border-box",
-              color: "#202124",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 999,
+              background: pathname === "/" ? "#e8f0fe" : "transparent",
+              color: pathname === "/" ? "#1a73e8" : "#5f6368",
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: "none",
+              border: pathname === "/" ? "1px solid #d2e3fc" : "1px solid transparent",
             }}
-          />
+          >
+            <BarChart2 size={14} /> Screener
+          </Link>
+          <Link
+            href="/portfolio"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 999,
+              background: pathname === "/portfolio" ? "#e8f0fe" : "transparent",
+              color: pathname === "/portfolio" ? "#1a73e8" : "#5f6368",
+              fontSize: 13,
+              fontWeight: 700,
+              textDecoration: "none",
+              border: pathname === "/portfolio" ? "1px solid #d2e3fc" : "1px solid transparent",
+            }}
+          >
+            <BriefcaseBusiness size={14} /> Portfolio
+          </Link>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, marginLeft: "auto" }}>
-          {!isMobile && (
+        {showSearch ? (
+          <div style={{ flex: 1, minWidth: isMobile ? "100%" : 240, maxWidth: 480, position: "relative" }}>
+            <Search size={16} color="#5f6368" style={{ position: "absolute", left: 12, top: 8 }} />
+            <input
+              value={query}
+              onChange={(e) => onQueryChange?.(e.target.value)}
+              placeholder={isMobile ? "Search..." : "Search stocks in your lists..."}
+              style={{
+                width: "100%",
+                padding: "6px 12px 6px 36px",
+                borderRadius: 24,
+                border: "1px solid #e8eaed",
+                background: "#f1f3f4",
+                fontSize: 14,
+                outline: "none",
+                boxSizing: "border-box",
+                color: "#202124",
+              }}
+            />
+          </div>
+        ) : (
+          <div style={{ flex: 1, minWidth: 24 }} />
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12, marginLeft: "auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {!isMobile && showPanelToggle && onRightPanelModeChange && (
             <button
               onClick={() => onRightPanelModeChange(rightPanelMode === "detail" ? "ai_chat" : "detail")}
               style={{

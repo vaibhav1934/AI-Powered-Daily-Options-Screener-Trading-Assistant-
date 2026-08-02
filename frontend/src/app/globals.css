@@ -26,6 +26,64 @@ body {
 }
 
 @layer utilities {
+  .skeleton-pulse {
+    position: relative;
+    overflow: hidden;
+    background: #edf1f5;
+  }
+
+  .skeleton-pulse::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.78) 50%, rgba(255, 255, 255, 0) 100%);
+    animation: skeleton-sheen 1.2s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-sheen {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .skeleton-line {
+    height: 10px;
+    border-radius: 999px;
+  }
+
+  .skeleton-line-md {
+    height: 14px;
+    border-radius: 999px;
+  }
+
+  .skeleton-block {
+    height: 72px;
+    border-radius: 12px;
+  }
+
+  .mobile-collapsible-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #d2e3fc;
+    background: #e8f0fe;
+    color: #1a73e8;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .portfolio-page-shell {
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 18px 24px 32px;
+    box-sizing: border-box;
+  }
+
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
   }
@@ -38,5 +96,143 @@ body {
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
+  }
+
+  .portfolio-summary-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr auto;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .portfolio-overview-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 14px;
+  }
+
+  .portfolio-form-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr 1fr auto;
+    gap: 8px;
+    align-items: end;
+  }
+
+  .portfolio-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .portfolio-main-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 0.95fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .portfolio-card-minheight {
+    min-height: 220px;
+  }
+
+  .portfolio-summary-minheight {
+    min-height: 108px;
+  }
+
+  .navbar-shell {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .auth-modal-overlay {
+    overflow-y: auto;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-modal-card {
+    width: min(420px, 100%);
+    max-height: none;
+    overflow: visible;
+    scrollbar-width: thin;
+    scrollbar-color: #c7cdd4 transparent;
+  }
+
+  .auth-modal-scroll {
+    width: 100%;
+    height: 100%;
+    overflow-y: visible;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 1180px) {
+    .portfolio-overview-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .portfolio-main-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 980px) {
+    .portfolio-page-shell {
+      padding: 14px 16px 24px;
+    }
+
+    .portfolio-summary-grid {
+      grid-template-columns: 1fr;
+      align-items: start;
+    }
+
+    .portfolio-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .portfolio-form-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .auth-modal-overlay {
+      align-items: flex-end !important;
+      padding: 8px !important;
+    }
+
+    .auth-modal-card {
+      width: 100% !important;
+      max-width: none !important;
+      max-height: 92dvh !important;
+      overflow: hidden !important;
+      border-radius: 16px 16px 0 0 !important;
+    }
+
+    .auth-modal-scroll {
+      overflow-y: auto;
+      padding: 20px 16px 18px;
+    }
+
+    .portfolio-page-shell {
+      padding: 12px 12px 20px;
+    }
+
+    .portfolio-kpi-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .portfolio-form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .portfolio-card-minheight,
+    .portfolio-summary-minheight {
+      min-height: unset;
+    }
   }
 }

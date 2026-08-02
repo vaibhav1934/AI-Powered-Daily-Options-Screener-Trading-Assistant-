@@ -9,20 +9,27 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 import structlog
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 
 from app.api.router import api_router, root_api_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError
 from app.core.rate_limiter import init_rate_limiters
+from app.db.models import User
 from app.db.session import engine
 from app.db.models import Base
+from app.db.session import async_session_factory
+from app.services import portfolio_management_service
 
 # Configure structured logging
 structlog.configure(
@@ -42,6 +49,13 @@ structlog.configure(
 logger = structlog.get_logger()
 
 
+LOCAL_ORIGIN_PATTERN = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$")
+
+
+def _is_allowed_dev_origin(origin: str) -> bool:
+    return bool(LOCAL_ORIGIN_PATTERN.match(origin or ""))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — startup and shutdown events."""
@@ -56,6 +70,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize rate limiters
     init_rate_limiters()
 
+    scheduler: AsyncIOScheduler | None = None
+
     # Ensure database tables exist (e.g. users table for JWT auth)
     try:
         async with engine.begin() as conn:
@@ -64,11 +80,100 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error("Failed to initialize database schema: %s", str(e))
 
+    async def _run_portfolio_maintenance(cadence: str) -> None:
+        """Run scheduled portfolio scoring/optimization for all active users."""
+        try:
+            async with async_session_factory() as session:
+                users = (
+                    await session.execute(select(User.id).where(User.is_active == True))
+                ).all()
+
+                processed = 0
+                failed = 0
+                for row in users:
+                    user_id = int(row.id)
+                    try:
+                        if cadence == "weekly":
+                            await portfolio_management_service.get_portfolio_optimization(
+                                session=session,
+                                user_id=user_id,
+                                cadence="weekly",
+                            )
+                        else:
+                            await portfolio_management_service.get_portfolio_score(
+                                session=session,
+                                user_id=user_id,
+                            )
+                        processed += 1
+                    except Exception as user_exc:
+                        failed += 1
+                        logger.error(
+                            "Scheduled portfolio maintenance failed for user",
+                            cadence=cadence,
+                            user_id=user_id,
+                            error=str(user_exc),
+                        )
+
+                logger.info(
+                    "Scheduled portfolio maintenance completed",
+                    cadence=cadence,
+                    processed=processed,
+                    failed=failed,
+                )
+        except Exception as exc:
+            logger.error(
+                "Scheduled portfolio maintenance job failed",
+                cadence=cadence,
+                error=str(exc),
+            )
+
+    if settings.app.portfolio_scheduler_enabled:
+        scheduler = AsyncIOScheduler(timezone=settings.app.app_timezone)
+        scheduler.add_job(
+            _run_portfolio_maintenance,
+            CronTrigger(
+                hour=settings.app.portfolio_daily_score_hour,
+                minute=settings.app.portfolio_daily_score_minute,
+                timezone=settings.app.app_timezone,
+            ),
+            args=["daily"],
+            id="portfolio_daily_score",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        scheduler.add_job(
+            _run_portfolio_maintenance,
+            CronTrigger(
+                day_of_week=settings.app.portfolio_weekly_optimize_day_of_week,
+                hour=settings.app.portfolio_weekly_optimize_hour,
+                minute=settings.app.portfolio_weekly_optimize_minute,
+                timezone=settings.app.app_timezone,
+            ),
+            args=["weekly"],
+            id="portfolio_weekly_optimize",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        scheduler.start()
+        logger.info(
+            "Portfolio scheduler started",
+            daily_hour=settings.app.portfolio_daily_score_hour,
+            daily_minute=settings.app.portfolio_daily_score_minute,
+            weekly_day=settings.app.portfolio_weekly_optimize_day_of_week,
+            weekly_hour=settings.app.portfolio_weekly_optimize_hour,
+            weekly_minute=settings.app.portfolio_weekly_optimize_minute,
+        )
+
     logger.info("Application ready")
 
     yield
 
     # Shutdown
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
+        logger.info("Portfolio scheduler stopped")
     logger.info("Shutting down Options Screener")
 
 
@@ -103,7 +208,12 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
-        allow_origin_regex="https://.*\\.vercel\\.app|https://.*\\.hf\\.space",
+        allow_origin_regex=(
+            r"https://.*\\.vercel\\.app"
+            r"|https://.*\\.hf\\.space"
+            r"|http://localhost(:[0-9]+)?"
+            r"|http://127\\.0\\.0\\.1(:[0-9]+)?"
+        ),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -114,12 +224,23 @@ def create_app() -> FastAPI:
         import time
         start_time = time.time()
         query_str = f"?{request.url.query}" if request.url.query else ""
+        origin = request.headers.get("origin", "")
         logger.info(
             "[FLOW: Backend Request] ──> Incoming %s %s%s",
             request.method, request.url.path, query_str
         )
         try:
             response = await call_next(request)
+            # Defensive CORS hardening for local development: ensure error/edge
+            # responses still include ACAO when Origin is localhost/127.0.0.1.
+            if origin and _is_allowed_dev_origin(origin):
+                if "access-control-allow-origin" not in response.headers:
+                    response.headers["Access-Control-Allow-Origin"] = origin
+                if "access-control-allow-credentials" not in response.headers:
+                    response.headers["Access-Control-Allow-Credentials"] = "true"
+                vary = response.headers.get("Vary", "")
+                if "Origin" not in vary:
+                    response.headers["Vary"] = f"{vary}, Origin".strip(", ")
             duration = round((time.time() - start_time) * 1000, 2)
             logger.info(
                 "[FLOW: Backend Response] <── Completed %s %s [%d] in %s ms",
@@ -153,6 +274,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(sqlalchemy.exc.OperationalError)
     @app.exception_handler(sqlalchemy.exc.InterfaceError)
+    @app.exception_handler(sqlalchemy.exc.TimeoutError)
     @app.exception_handler(socket.gaierror)
     async def db_connection_error_handler(request: Request, exc: Exception) -> JSONResponse:
         import uuid
@@ -179,7 +301,22 @@ def create_app() -> FastAPI:
         import uuid
         trace_id = str(uuid.uuid4())
         err_str = str(exc).lower()
-        if any(w in err_str for w in ("gaierror", "getaddrinfo", "operationalerror", "connection refused", "cannotconnectnowerror", "connection timed out", "could not translate host name")):
+        if any(w in err_str for w in (
+            "gaierror",
+            "getaddrinfo",
+            "operationalerror",
+            "interfaceerror",
+            "timeouterror",
+            "connection refused",
+            "cannotconnectnowerror",
+            "connection timed out",
+            "could not translate host name",
+            "too many clients",
+            "max clients reached",
+            "emaxconnsession",
+            "max_client_conn",
+            "queuepool limit",
+        )):
             return await db_connection_error_handler(request, exc)
             
         logger.error(

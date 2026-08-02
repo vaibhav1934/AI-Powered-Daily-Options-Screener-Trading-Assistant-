@@ -15,6 +15,8 @@ export interface TokenResponse {
   expires_in: number;
 }
 
+const DEV_API_KEY = "dev_key";
+
 const ACCESS_TOKEN_KEY = "stockglass_access_token";
 const REFRESH_TOKEN_KEY = "stockglass_refresh_token";
 const USER_PROFILE_KEY = "stockglass_user_profile";
@@ -86,6 +88,30 @@ export async function loginUser(username: string, password: string): Promise<Use
   return profile;
 }
 
+export async function registerUser(username: string, password: string): Promise<UserProfile> {
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!res.ok) {
+    let errMsg = "Registration failed";
+    try {
+      const errJson = await res.json();
+      if (errJson.error?.message) errMsg = errJson.error.message;
+    } catch {}
+    throw new Error(errMsg);
+  }
+
+  const tokens: TokenResponse = await res.json();
+  setAuthTokens(tokens);
+  const profile = await fetchCurrentUser(tokens.access_token);
+  setAuthTokens(tokens, profile);
+  window.dispatchEvent(new Event("stockglass_auth_changed"));
+  return profile;
+}
+
 export async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
@@ -148,6 +174,8 @@ export async function authFetch(url: string | URL, options: RequestInit = {}): P
   
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
+  } else if (!token && !headers.has("Authorization") && !headers.has("X-API-Key")) {
+    headers.set("X-API-Key", DEV_API_KEY);
   }
 
   let res = await fetch(url, { ...options, headers });
@@ -159,6 +187,36 @@ export async function authFetch(url: string | URL, options: RequestInit = {}): P
       headers.set("Authorization", `Bearer ${newToken}`);
       res = await fetch(url, { ...options, headers });
     }
+  }
+
+  return res;
+}
+
+export async function authFetchStrict(url: string | URL, options: RequestInit = {}): Promise<Response> {
+  let token = getAccessToken();
+  if (!token) {
+    throw new Error("Login required");
+  }
+
+  const headers = new Headers(options.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.delete("X-API-Key");
+
+  let res = await fetch(url, { ...options, headers });
+
+  if (res.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (!newToken) {
+      throw new Error("Login required");
+    }
+
+    token = newToken;
+    headers.set("Authorization", `Bearer ${token}`);
+    res = await fetch(url, { ...options, headers });
+  }
+
+  if (res.status === 401) {
+    throw new Error("Login required");
   }
 
   return res;

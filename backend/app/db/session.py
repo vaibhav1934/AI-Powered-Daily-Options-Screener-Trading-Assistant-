@@ -27,6 +27,8 @@ else:
         pool_size=_settings.database.pool_size,
         max_overflow=_settings.database.pool_max_overflow,
         pool_recycle=_settings.database.pool_recycle,
+        pool_timeout=_settings.database.pool_timeout,
+        pool_use_lifo=True,
         pool_pre_ping=True,
         echo=False,
     )

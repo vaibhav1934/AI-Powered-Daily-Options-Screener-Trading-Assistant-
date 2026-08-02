@@ -1,5 +1,6 @@
 // src/lib/sse.ts
 import { API_BASE_URL } from "./config";
+import { authFetchStrict } from "./auth";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -9,11 +10,10 @@ export interface ChatMessage {
 export type StreamChunk = { type: 'chunk', content: string } | { type: 'tool_call', name: string, args: any };
 
 export async function* streamChat(message: string, conversationId: string, signal?: AbortSignal): AsyncGenerator<StreamChunk, void, unknown> {
-  const response = await fetch(`${API_BASE_URL}/chat`, {
+  const response = await authFetchStrict(`${API_BASE_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-API-Key": "dev_key",
     },
     body: JSON.stringify({ message, conversation_id: conversationId }),
     signal,
