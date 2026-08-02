@@ -453,7 +453,8 @@ async def get_portfolio_score(
             ret_60 = ret_df.tail(60)
             if ret_60.shape[0] >= 20 and ret_60.shape[1] >= 2:
                 corr = ret_60.corr()
-                upper_vals = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool)).stack().values
+                upper_vals = corr.values[np.triu_indices_from(corr.values, k=1)]
+                upper_vals = upper_vals[~np.isnan(upper_vals)]
                 if len(upper_vals) > 0:
                     avg_corr = float(np.nanmean(upper_vals))
                     diversification_score = _clamp(100.0 - (avg_corr * 100.0))
@@ -786,10 +787,15 @@ async def get_portfolio_optimization(
     if history and len(history) >= 2:
         frame = pd.concat([v.rename(k) for k, v in history.items() if not v.empty], axis=1).pct_change().dropna(how="all")
         top5 = sorted(snapshots, key=lambda x: x.weight, reverse=True)[:5]
-        top_syms = [s.position.symbol.upper() for s in top5 if s.position.symbol.upper() in frame.columns]
+        top_syms: list[str] = []
+        for s in top5:
+            sym = s.position.symbol.upper()
+            if sym in frame.columns and sym not in top_syms:
+                top_syms.append(sym)
         if len(top_syms) >= 2:
             corr = frame[top_syms].tail(60).corr().fillna(0.0)
-            upper = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool)).stack().values
+            upper = corr.values[np.triu_indices_from(corr.values, k=1)]
+            upper = upper[~np.isnan(upper)]
             if len(upper) > 0 and float(np.mean(upper)) > CORR_TRIGGER:
                 triggered_steps.append("STEP_2_CORRELATION_DECLUSTER")
                 weakest = min(top5, key=lambda x: conv_map.get(x.position.symbol.upper(), 5.0))
