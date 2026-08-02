@@ -14,6 +14,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import require_current_user
+from app.db.models import User
 from app.db.session import get_db
 from app.db.schemas import ChatMessageRequest
 
@@ -26,6 +28,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 async def chat(
     request: ChatMessageRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_current_user),
 ):
     """
     Chat endpoint — processes a message and returns an SSE stream.
@@ -37,7 +40,8 @@ async def chat(
     async def event_stream():
         async for chunk in process_chat_message(
             message=request.message,
-            conversation_id=request.conversation_id,
+            conversation_id=request.conversation_id or "default",
+            user_scope=f"user:{current_user.id}",
             session=session,
         ):
             data = json.dumps(chunk)

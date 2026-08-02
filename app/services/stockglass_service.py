@@ -13,6 +13,7 @@ import math
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 
+from fastapi import HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -45,8 +46,54 @@ from app.framework.factors.f46_edgar_shelf_check import F46EDGARShelfCheck
 from app.framework.factors.registry import factor_registry
 from app.services.synthesis_service import synthesize_reasons, synthesize_news_summary
 from app.services.options_service import get_automated_option_contract
+from app.services.scan_service import evaluate_and_persist_on_demand
 
 logger = logging.getLogger(__name__)
+
+
+def _factor_code_to_number(code: str) -> int:
+    try:
+        return int(code.replace("F", ""))
+    except Exception:
+        return 999
+
+
+def _layer_for_factor_number(fnum: int) -> tuple[str, str]:
+    for _, lname, start, end, frange in LAYER_DEFINITIONS:
+        if start <= fnum <= end:
+            return lname, frange
+    return "Unknown", "Unknown"
+
+
+def _decision_status(triggered: bool, vetoed: bool) -> str:
+    if vetoed:
+        return "fail"
+    if triggered:
+        return "pass"
+    return "neutral"
+
+
+def _should_refresh_long_term(scan: Optional[DailyScan], now_utc: datetime) -> bool:
+    """Monthly cadence refresh or thesis-change event refresh for long-term payload."""
+    if not scan:
+        return False
+
+    payload = scan.factor_results_json if isinstance(scan.factor_results_json, dict) else {}
+    dual = payload.get("dual_horizon", {}) if isinstance(payload, dict) else {}
+    long_term = dual.get("long_term", {}) if isinstance(dual, dict) else {}
+
+    if not long_term:
+        return True
+
+    refresh_due = False
+    scan_dt = scan.scan_date
+    if scan_dt is not None:
+        scan_month = (scan_dt.year, scan_dt.month)
+        now_month = (now_utc.year, now_utc.month)
+        refresh_due = scan_month != now_month
+
+    thesis_event = bool(long_term.get("thesis_change_event_detected", False))
+    return refresh_due or thesis_event
 
 # 10 Layers definition mapping to factor ranges as per Section 0
 LAYER_DEFINITIONS = [
@@ -63,7 +110,7 @@ LAYER_DEFINITIONS = [
 ]
 
 
-async def get_indices(session: AsyncSession) -> list[IndexItemSchema]:
+async def get_indices() -> list[IndexItemSchema]:
     """
     Get indices strip data (S&P 500, Nasdaq, Dow Jones).
     Uses Finnhub to fetch quotes for proxy ETFs (SPY, QQQ, DIA) and scales to index values.
@@ -72,7 +119,7 @@ async def get_indices(session: AsyncSession) -> list[IndexItemSchema]:
     client = FinnhubClient()
     logger.info("[FLOW: Service Layer] ──> get_indices: Fetching SPY, QQQ, DIA from Finnhub or fallback")
     try:
-        quotes = await client.get_quotes_batch(["SPY", "QQQ", "DIA"], session=session)
+        quotes = await client.get_quotes_batch(["SPY", "QQQ", "DIA"])
         quote_map = {q.ticker: q for q in quotes}
         
         spy = quote_map.get("SPY")
@@ -417,6 +464,17 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
         scan = await evaluate_and_persist_on_demand(session, symbol, quote, real_name, real_sector)
         if scan and scan.entry_price and price == 0.0:
             price = scan.entry_price
+    else:
+        now_utc = datetime.now(timezone.utc)
+        if _should_refresh_long_term(scan, now_utc):
+            from app.services.scan_service import evaluate_and_persist_on_demand
+            logger.info(
+                "[FLOW: Service Layer] Long-term refresh required for %s (monthly/thesis-change). Re-evaluating on demand.",
+                symbol,
+            )
+            refreshed = await evaluate_and_persist_on_demand(session, symbol, quote, real_name, real_sector)
+            if refreshed is not None:
+                scan = refreshed
 
     score = round(scan.score, 1) if scan else 0.0
     hard_flags = []
@@ -474,8 +532,14 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             score=tactical_payload.get("score") if isinstance(tactical_payload.get("score"), (int, float)) else None,
             regime_gate_pass=bool(tactical_payload.get("regime_gate_pass", False)),
             regime_fail_reasons=list(tactical_payload.get("regime_fail_reasons", [])),
+            catalyst_signals=list(tactical_payload.get("catalyst_signals", [])),
+            technical_signals=list(tactical_payload.get("technical_signals", [])),
+            options_signals=list(tactical_payload.get("options_signals", [])),
             conviction_tier=tactical_payload.get("conviction_tier") if isinstance(tactical_payload.get("conviction_tier"), str) else None,
             sizing_cap=tactical_payload.get("sizing_cap") if isinstance(tactical_payload.get("sizing_cap"), str) else None,
+            entry_cutoff=tactical_payload.get("entry_cutoff") if isinstance(tactical_payload.get("entry_cutoff"), str) else None,
+            binary_event_exit=tactical_payload.get("binary_event_exit") if isinstance(tactical_payload.get("binary_event_exit"), str) else None,
+            invalidation_rule=tactical_payload.get("invalidation_rule") if isinstance(tactical_payload.get("invalidation_rule"), str) else None,
         ),
         long_term=LongTermFrameworkSchema(
             status=str(long_term_payload.get("status", "DATA_NOT_AVAILABLE")),
@@ -483,7 +547,13 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             thesis_strength_score=long_term_payload.get("thesis_strength_score") if isinstance(long_term_payload.get("thesis_strength_score"), (int, float)) else None,
             entry_timing_score=long_term_payload.get("entry_timing_score") if isinstance(long_term_payload.get("entry_timing_score"), (int, float)) else None,
             portfolio_fit_score=long_term_payload.get("portfolio_fit_score") if isinstance(long_term_payload.get("portfolio_fit_score"), (int, float)) else None,
+            target_valuation_band=long_term_payload.get("target_valuation_band") if isinstance(long_term_payload.get("target_valuation_band"), str) else None,
+            moat_signals=list(long_term_payload.get("moat_signals", [])),
+            secular_signals=list(long_term_payload.get("secular_signals", [])),
+            management_signals=list(long_term_payload.get("management_signals", [])),
+            thesis_change_event_detected=bool(long_term_payload.get("thesis_change_event_detected", False)),
             missing_inputs=list(long_term_payload.get("missing_inputs", [])),
+            thesis_break_condition=long_term_payload.get("thesis_break_condition") if isinstance(long_term_payload.get("thesis_break_condition"), str) else None,
         ),
     )
 
@@ -555,11 +625,26 @@ async def get_stock_factors(session: AsyncSession, symbol: str) -> FullFactorBre
             flog = log_map.get(code)
             status = "neutral"
             detail = desc
+            evaluation_status = None
+            stubbed = None
+            reason = None
+            source_tier = None
             
             if flog:
                 saved_detail = None
                 if flog.result_detail_json and isinstance(flog.result_detail_json, dict):
                     saved_detail = flog.result_detail_json.get("detail")
+                    evaluation_status = flog.result_detail_json.get("status")
+                    stubbed_val = flog.result_detail_json.get("stubbed")
+                    stubbed = bool(stubbed_val) if isinstance(stubbed_val, bool) else None
+                    md = flog.result_detail_json.get("metadata")
+                    if isinstance(md, dict):
+                        reason_val = md.get("reason")
+                        source_tier_val = md.get("source_tier")
+                        if isinstance(reason_val, str) and reason_val.strip():
+                            reason = reason_val.strip()
+                        if isinstance(source_tier_val, str) and source_tier_val.strip():
+                            source_tier = source_tier_val.strip()
                 if flog.vetoed:
                     status = "fail"
                     detail = saved_detail or f"Failed check: {flog.factor_name} veto applied."
@@ -573,6 +658,9 @@ async def get_stock_factors(session: AsyncSession, symbol: str) -> FullFactorBre
                 # Return neutral / unconfigured when no DB log exists (No simulated data per user rule)
                 status = "neutral"
                 detail = f"Not evaluated: {name} has no scan record in database."
+                evaluation_status = "UNCONFIGURED"
+                stubbed = True
+                reason = "missing_scan_record"
                     
             if status == "pass":
                 total_pass += 1
@@ -582,7 +670,15 @@ async def get_stock_factors(session: AsyncSession, symbol: str) -> FullFactorBre
                 total_neutral += 1
                 
             factor_items.append(
-                FactorBreakdownItem(code=code if fid_num >= 10 else f"F{fid_num}", status=status, detail=detail)
+                FactorBreakdownItem(
+                    code=code if fid_num >= 10 else f"F{fid_num}",
+                    status=status,
+                    detail=detail,
+                    evaluationStatus=evaluation_status,
+                    stubbed=stubbed,
+                    reason=reason,
+                    sourceTier=source_tier,
+                )
             )
             
         layer_items.append(
@@ -591,6 +687,127 @@ async def get_stock_factors(session: AsyncSession, symbol: str) -> FullFactorBre
         
     summary = FactorSummarySchema(**{"pass": total_pass, "neutral": total_neutral, "fail": total_fail})
     return FullFactorBreakdownSchema(symbol=symbol, summary=summary, layers=layer_items)
+
+
+async def get_stock_factor_audit(
+    session: AsyncSession,
+    symbol: str,
+    force_live: bool = True,
+    require_all_live: bool = False,
+) -> dict[str, Any]:
+    """
+    Return a full factor decision audit (F1-F50) with source API call outputs.
+    If force_live is true, re-runs on-demand evaluation before building the payload.
+    """
+    symbol = symbol.upper()
+    target_date = await _get_latest_scan_date(session) or date.today()
+    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+
+    stmt = (
+        select(DailyScan)
+        .options(selectinload(DailyScan.factor_logs))
+        .where(DailyScan.scan_date >= start_dt, DailyScan.ticker == symbol)
+        .order_by(DailyScan.id.desc())
+        .limit(1)
+    )
+    scan = (await session.execute(stmt)).scalar_one_or_none()
+
+    if force_live:
+        client = FinnhubClient()
+        try:
+            quote = await client.get_quote(symbol, session=session)
+            profile = await client.get_company_profile(symbol, session=session)
+        finally:
+            await client.close()
+
+        if quote is None or quote.current_price <= 0:
+            raise HTTPException(status_code=503, detail=f"Live quote unavailable for {symbol}; factor audit cannot be generated.")
+
+        fallback_name = profile.get("name") if isinstance(profile, dict) else None
+        fallback_sector = profile.get("sector") if isinstance(profile, dict) else None
+        live_scan = await evaluate_and_persist_on_demand(
+            session=session,
+            symbol=symbol,
+            quote=quote,
+            name=(fallback_name or symbol),
+            sector=(fallback_sector or "Unknown"),
+        )
+        if live_scan is None:
+            raise HTTPException(status_code=503, detail=f"Live factor audit could not be completed for {symbol}.")
+        scan = live_scan
+
+    if scan is None:
+        raise HTTPException(status_code=404, detail=f"No scan data available for {symbol}.")
+
+    if not scan.factor_logs or len(scan.factor_logs) < 50:
+        raise HTTPException(status_code=503, detail=f"Incomplete factor log set for {symbol}; expected 50, got {len(scan.factor_logs) if scan.factor_logs else 0}.")
+
+    factor_logs_sorted = sorted(scan.factor_logs, key=lambda f: _factor_code_to_number(f.factor_id))
+    scan_payload = scan.factor_results_json if isinstance(scan.factor_results_json, dict) else {}
+    api_calls = scan_payload.get("audit_api_calls") if isinstance(scan_payload.get("audit_api_calls"), list) else []
+    context_snapshot = scan_payload.get("audit_context_snapshot") if isinstance(scan_payload.get("audit_context_snapshot"), dict) else {}
+
+    factors_payload: list[dict[str, Any]] = []
+    live_violations: list[str] = []
+    for flog in factor_logs_sorted:
+        fnum = _factor_code_to_number(flog.factor_id)
+        layer_name, layer_range = _layer_for_factor_number(fnum)
+        result_detail = flog.result_detail_json if isinstance(flog.result_detail_json, dict) else {}
+        eval_status = result_detail.get("status")
+        stubbed = result_detail.get("stubbed")
+        if eval_status != "LIVE" or bool(stubbed):
+            live_violations.append(flog.factor_id)
+
+        factors_payload.append(
+            {
+                "layer": layer_name,
+                "layerRange": layer_range,
+                "factorNumber": fnum,
+                "factorCode": flog.factor_id,
+                "factorName": flog.factor_name,
+                "decision": {
+                    "status": _decision_status(flog.triggered, flog.vetoed),
+                    "triggered": flog.triggered,
+                    "vetoed": flog.vetoed,
+                    "action": result_detail.get("action"),
+                    "evaluationStatus": eval_status,
+                    "stubbed": bool(stubbed) if isinstance(stubbed, bool) else None,
+                    "detail": result_detail.get("detail", ""),
+                    "metadata": result_detail.get("metadata") if isinstance(result_detail.get("metadata"), dict) else {},
+                },
+                "apiCalls": api_calls,
+            }
+        )
+
+    if require_all_live and live_violations:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "One or more factors are not in LIVE status.",
+                "symbol": symbol,
+                "factors": live_violations,
+            },
+        )
+
+    return {
+        "symbol": symbol,
+        "scanId": scan.id,
+        "scanDate": scan.scan_date.isoformat() if scan.scan_date else None,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "dataPolicy": {
+            "liveOnly": True,
+            "mockData": False,
+            "stubbedFactors": False,
+        },
+        "liveValidation": {
+            "allFactorsLive": len(live_violations) == 0,
+            "nonLiveFactors": live_violations,
+            "strictModeRequested": require_all_live,
+        },
+        "scanApiCalls": api_calls,
+        "scanInputs": context_snapshot,
+        "factors": factors_payload,
+    }
 
 
 async def get_stock_live_evaluation(session: AsyncSession, symbol: str) -> StockDetailSchema:
@@ -790,7 +1007,8 @@ async def get_dual_horizon_lists(session: AsyncSession) -> DualHorizonListRespon
         sector = (mdata.get("sector") if isinstance(mdata, dict) else None) or (univ.sector if univ else "Unknown")
 
         tactical_score = tactical.get("score") if isinstance(tactical.get("score"), (int, float)) else None
-        if bool(tactical.get("regime_gate_pass")) and isinstance(tactical_score, (int, float)):
+        tactical_valid = isinstance(tactical_score, (int, float)) and math.isfinite(float(tactical_score))
+        if bool(tactical.get("regime_gate_pass")) and tactical_valid:
             tactical_rows.append(
                 FrameworkCandidateSchema(
                     symbol=scan.ticker,
@@ -803,7 +1021,8 @@ async def get_dual_horizon_lists(session: AsyncSession) -> DualHorizonListRespon
             )
 
         long_term_score = long_term.get("score") if isinstance(long_term.get("score"), (int, float)) else None
-        if long_term.get("status") == "SCORED" and isinstance(long_term_score, (int, float)):
+        long_term_valid = isinstance(long_term_score, (int, float)) and math.isfinite(float(long_term_score))
+        if long_term.get("status") == "SCORED" and long_term_valid:
             long_term_rows.append(
                 FrameworkCandidateSchema(
                     symbol=scan.ticker,

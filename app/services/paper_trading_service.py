@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 async def create_position(
-    session: AsyncSession, data: PositionCreateSchema
+    session: AsyncSession,
+    data: PositionCreateSchema,
+    user_id: int,
 ) -> PositionItemSchema:
     """Create a new open paper trading position."""
     # Generate ID formatted like pos_8f2a1 as shown in contract
@@ -36,6 +38,7 @@ async def create_position(
     
     pos = Position(
         id=pos_id,
+        user_id=user_id,
         symbol=data.symbol.upper(),
         qty=data.qty,
         entry_price=data.entryPrice,
@@ -59,10 +62,12 @@ async def create_position(
 
 
 async def get_positions(
-    session: AsyncSession, status_filter: Optional[str] = None
+    session: AsyncSession,
+    user_id: int,
+    status_filter: Optional[str] = None,
 ) -> PositionListResponseSchema:
     """Get positions with server-side computed currentPrice and unrealizedPnl."""
-    stmt = select(Position).order_by(Position.opened_at.desc())
+    stmt = select(Position).where(Position.user_id == user_id).order_by(Position.opened_at.desc())
     if status_filter:
         if status_filter.lower() == "open":
             stmt = stmt.where(Position.status == PositionStatus.OPEN)
@@ -127,9 +132,13 @@ async def get_positions(
     return PositionListResponseSchema(results=items)
 
 
-async def close_position(session: AsyncSession, position_id: str) -> Optional[PositionItemSchema]:
+async def close_position(
+    session: AsyncSession,
+    user_id: int,
+    position_id: str,
+) -> Optional[PositionItemSchema]:
     """Close an open position and calculate realized P&L server-side."""
-    stmt = select(Position).where(Position.id == position_id)
+    stmt = select(Position).where(Position.id == position_id, Position.user_id == user_id)
     result = await session.execute(stmt)
     pos = result.scalar_one_or_none()
     

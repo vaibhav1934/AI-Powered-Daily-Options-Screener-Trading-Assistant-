@@ -12,7 +12,7 @@ from decimal import Decimal
 import logging
 import asyncio
 import yfinance as yf
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Optional
 
 import httpx
@@ -67,17 +67,20 @@ class FinnhubClient:
         """
         # Check cache first
         if session:
-            cached = await get_cached_response(
-                session=session,
-                provider=self.provider_name,
-                endpoint=endpoint,
-                params=params,
-            )
-            if cached is not None:
-                is_stale = cached.get("_cache_stale", False) if isinstance(cached, dict) else False
-                if not is_stale:
-                    logger.debug("Cache hit for %s %s", endpoint, params)
-                    return cached
+            try:
+                cached = await get_cached_response(
+                    session=session,
+                    provider=self.provider_name,
+                    endpoint=endpoint,
+                    params=params,
+                )
+                if cached is not None:
+                    is_stale = cached.get("_cache_stale", False) if isinstance(cached, dict) else False
+                    if not is_stale:
+                        logger.debug("Cache hit for %s %s", endpoint, params)
+                        return cached
+            except Exception as e:
+                logger.warning("Cache read bypass for %s %s due to DB/cache error: %s", endpoint, params, e)
 
         # Acquire rate limit token
         await rate_limiter_registry.acquire(self.provider_name)
@@ -89,14 +92,17 @@ class FinnhubClient:
 
         # Store in cache
         if session:
-            await set_cached_response(
-                session=session,
-                provider=self.provider_name,
-                endpoint=endpoint,
-                params=params,
-                response_json=data,
-                ttl_seconds=self._cache_ttl,
-            )
+            try:
+                await set_cached_response(
+                    session=session,
+                    provider=self.provider_name,
+                    endpoint=endpoint,
+                    params=params,
+                    response_json=data,
+                    ttl_seconds=self._cache_ttl,
+                )
+            except Exception as e:
+                logger.warning("Cache write bypass for %s %s due to DB/cache error: %s", endpoint, params, e)
 
         return data
 
@@ -212,6 +218,70 @@ class FinnhubClient:
                     )
                 )
         return items
+
+    async def get_earnings_for_symbol_window(
+        self,
+        ticker: str,
+        start_date: date,
+        end_date: date,
+        session: Any = None,
+    ) -> list[EarningsEntry]:
+        """Fetch earnings entries for a single symbol within a date window."""
+        entries = await self.get_earnings_calendar(start_date, end_date, session=session)
+        ticker_u = ticker.upper()
+        return [e for e in entries if e.ticker.upper() == ticker_u]
+
+    async def get_upgrade_downgrade_actions(
+        self,
+        ticker: str,
+        days: int = 14,
+        session: Any = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch analyst upgrade/downgrade actions for a ticker.
+        Returns an empty list when unavailable.
+        """
+        to_date = date.today()
+        from_date = to_date - timedelta(days=max(1, days))
+        try:
+            data = await self._request(
+                "/stock/upgrade-downgrade",
+                {
+                    "symbol": ticker,
+                    "from": from_date.isoformat(),
+                    "to": to_date.isoformat(),
+                },
+                session,
+            )
+            if isinstance(data, list):
+                return [d for d in data if isinstance(d, dict)]
+        except Exception as e:
+            logger.warning("Failed to fetch analyst actions for %s: %s", ticker, e)
+        return []
+
+    async def get_company_earnings_history(
+        self,
+        ticker: str,
+        limit: int = 8,
+        session: Any = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch historical quarterly earnings rows for a symbol.
+        Used as a free proxy for guidance-revision trend modeling.
+        """
+        try:
+            data = await self._request(
+                "/stock/earnings",
+                {"symbol": ticker, "limit": max(1, int(limit))},
+                session,
+            )
+            if isinstance(data, list):
+                rows = [r for r in data if isinstance(r, dict)]
+                rows.sort(key=lambda r: str(r.get("period", "")), reverse=True)
+                return rows
+        except Exception as e:
+            logger.warning("Failed to fetch earnings history for %s: %s", ticker, e)
+        return []
 
     async def get_daily_candles(
         self,

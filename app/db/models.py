@@ -310,6 +310,12 @@ class Position(Base):
     __tablename__ = "positions"
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     qty: Mapped[float] = mapped_column(Float, nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -327,6 +333,8 @@ class Position(Base):
     closed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="positions")
 
 
 # ---------------------------------------------------------------------------
@@ -377,4 +385,6 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+    positions: Mapped[list["Position"]] = relationship("Position", back_populates="user")
 

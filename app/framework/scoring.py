@@ -59,7 +59,7 @@ def calculate_conviction_score(ctx: ScanContext) -> float:
         score = min(score, 6.5)
 
     # Penny stocks get 0.0 conviction score
-    if "F00" in ctx.triggered_factors or (ctx.current_price > 0 and ctx.current_price < 2.0):
+    if "F01" in ctx.triggered_factors or (ctx.current_price > 0 and ctx.current_price < 2.0):
         return 0.0
 
     return round(score, 1)

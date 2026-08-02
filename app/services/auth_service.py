@@ -48,6 +48,16 @@ class UserNotFoundError(AuthenticationError):
     error_code = "USER_INACTIVE_OR_NOT_FOUND"
 
 
+class UserAlreadyExistsError(AuthenticationError):
+    status_code = 409
+    error_code = "USER_ALREADY_EXISTS"
+
+
+class RegistrationValidationError(AuthenticationError):
+    status_code = 400
+    error_code = "REGISTRATION_VALIDATION_ERROR"
+
+
 def hash_password(password: str) -> str:
     """Hash a password using salted PBKDF2-HMAC-SHA256."""
     salt = secrets.token_hex(SALT_SIZE)
@@ -164,4 +174,34 @@ async def create_user_in_db(
     await session.commit()
     await session.refresh(new_user)
     logger.info("Created new user account for '%s'", username)
+    return new_user
+
+
+async def register_user(
+    session: AsyncSession,
+    username: str,
+    password: str,
+) -> User:
+    """Register a brand-new user with basic validation and uniqueness checks."""
+    normalized_username = username.strip()
+    if len(normalized_username) < 3 or len(normalized_username) > 50:
+        raise RegistrationValidationError("Username must be between 3 and 50 characters.")
+    if not normalized_username.replace("_", "").replace("-", "").isalnum():
+        raise RegistrationValidationError("Username may contain only letters, numbers, hyphens, and underscores.")
+    if len(password) < 8:
+        raise RegistrationValidationError("Password must be at least 8 characters long.")
+
+    existing_user = await get_user_by_username(session, normalized_username)
+    if existing_user is not None:
+        raise UserAlreadyExistsError("That username is already registered.")
+
+    new_user = User(
+        username=normalized_username,
+        password_hash=hash_password(password),
+        is_active=True,
+    )
+    session.add(new_user)
+    await session.commit()
+    await session.refresh(new_user)
+    logger.info("Registered new user account for '%s'", normalized_username)
     return new_user

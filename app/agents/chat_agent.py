@@ -82,6 +82,7 @@ def get_available_tools() -> List[Dict[str, Any]]:
 async def process_chat_message(
     message: str,
     conversation_id: str,
+    user_scope: str,
     session: AsyncSession,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
@@ -90,12 +91,14 @@ async def process_chat_message(
     """
     client = LLMClient()
     
+    convo_key = f"{user_scope}:{conversation_id}"
+
     # Init conversation history if new
-    if conversation_id not in CONVERSATIONS:
-        CONVERSATIONS[conversation_id] = []
+    if convo_key not in CONVERSATIONS:
+        CONVERSATIONS[convo_key] = []
         
     # Append user message
-    CONVERSATIONS[conversation_id].append({"role": "user", "content": message})
+    CONVERSATIONS[convo_key].append({"role": "user", "content": message})
     
     # Build system prompt with current context
     now = get_cst_now()
@@ -150,7 +153,7 @@ async def process_chat_message(
     try:
         # 1st LLM call (to get answer or tool calls)
         stream = client.stream_chat(
-            messages=CONVERSATIONS[conversation_id][-10:], # type: ignore
+            messages=CONVERSATIONS[convo_key][-10:], # type: ignore
             system_prompt=sys_prompt,
             tools=tools
         )
@@ -224,7 +227,7 @@ async def process_chat_message(
                 pass
 
         # Append assistant message to history
-        CONVERSATIONS[conversation_id].append({"role": "assistant", "content": current_text})
+        CONVERSATIONS[convo_key].append({"role": "assistant", "content": current_text})
         
     except Exception as e:
         logger.error("Error in chat agent: %s", str(e), exc_info=True)

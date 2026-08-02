@@ -302,8 +302,14 @@ class TacticalFrameworkSchema(BaseModel):
     score: Optional[float] = None
     regime_gate_pass: bool = False
     regime_fail_reasons: list[str] = []
+    catalyst_signals: list[str] = []
+    technical_signals: list[str] = []
+    options_signals: list[str] = []
     conviction_tier: Optional[str] = None
     sizing_cap: Optional[str] = None
+    entry_cutoff: Optional[str] = None
+    binary_event_exit: Optional[str] = None
+    invalidation_rule: Optional[str] = None
 
 
 class LongTermFrameworkSchema(BaseModel):
@@ -312,7 +318,13 @@ class LongTermFrameworkSchema(BaseModel):
     thesis_strength_score: Optional[float] = None
     entry_timing_score: Optional[float] = None
     portfolio_fit_score: Optional[float] = None
+    target_valuation_band: Optional[str] = None
+    moat_signals: list[str] = []
+    secular_signals: list[str] = []
+    management_signals: list[str] = []
+    thesis_change_event_detected: bool = False
     missing_inputs: list[str] = []
+    thesis_break_condition: Optional[str] = None
 
 
 class DualFrameworkSchema(BaseModel):
@@ -414,6 +426,10 @@ class FactorBreakdownItem(BaseModel):
     code: str
     status: str  # "pass", "neutral", "fail"
     detail: str
+    evaluationStatus: Optional[str] = None  # "LIVE" | "UNCONFIGURED"
+    stubbed: Optional[bool] = None
+    reason: Optional[str] = None
+    sourceTier: Optional[str] = None
 
 
 class LayerBreakdownItem(BaseModel):
@@ -463,10 +479,49 @@ class PositionListResponseSchema(BaseModel):
     results: list[PositionItemSchema]
 
 
+class PortfolioComponentScoreSchema(BaseModel):
+    name: str
+    weight: float
+    score: Optional[float] = None
+    status: str
+    detail: str
+
+
+class PortfolioScoreResponseSchema(BaseModel):
+    asOf: str
+    compositeScore: Optional[float] = None
+    band: str
+    components: list[PortfolioComponentScoreSchema]
+    missingComponents: list[str] = []
+    metrics: dict[str, Any] = {}
+
+
+class PortfolioActionSchema(BaseModel):
+    priority: int
+    action: str
+    symbol: Optional[str] = None
+    trigger: str
+    reason: str
+    metrics: dict[str, Any] = {}
+
+
+class PortfolioOptimizationResponseSchema(BaseModel):
+    asOf: str
+    cadence: str
+    triggeredSteps: list[str] = []
+    actions: list[PortfolioActionSchema]
+    score: PortfolioScoreResponseSchema
+
+
 # ---------------------------------------------------------------------------
 # Authentication Schemas (JWT Access & Refresh Tokens)
 # ---------------------------------------------------------------------------
 class LoginRequestSchema(BaseModel):
+    username: str
+    password: str
+
+
+class RegisterRequestSchema(BaseModel):
     username: str
     password: str
 

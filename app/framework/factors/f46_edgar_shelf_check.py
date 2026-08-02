@@ -33,17 +33,13 @@ class F46EDGARShelfCheck(BaseFactor):
         Near-ATH + recent shelf = potential dilution risk → flag/veto.
         """
         if ctx.edgar_check_status == "UNAVAILABLE":
-            return FactorResult(
-                factor_id=self.factor_id,
-                factor_name=self.name,
-                layer_number=self.layer,
-                status=FactorStatus.UNCONFIGURED,
-                triggered=False,
-                action=FactorAction.PASS,
-                vetoed=False,
-                stubbed=True,
-                detail="SEC EDGAR shelf check UNAVAILABLE: API unreachable or rate limited. No fallback data provided.",
-                metadata={"status": "UNAVAILABLE"},
+            return self._trigger(
+                action=FactorAction.VETO,
+                detail=(
+                    "SEC EDGAR shelf check is unavailable (API unreachable/rate limited). "
+                    "Framework requires a successful shelf/dilution check before entry. Entry blocked."
+                ),
+                metadata={"status": "UNAVAILABLE", "enforcement": "fail_closed"},
             )
 
         if not ctx.near_ath_proximity:
