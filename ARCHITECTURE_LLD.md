@@ -895,4 +895,15 @@ Evolve the app from a single hardcoded developer user path into a real multi-use
 2. Registration validates password confirmation client-side before attempting account creation.
 3. After registration, the user is automatically treated as logged in and the app continues under the issued JWT session.
 
+---
 
+## 16. Portfolio & API Hardening Updates (2026-08-02)
+
+### Zero Mock Enforcement & Ticker Keyword Guards
+- Removed all instances of fallback string formatting (e.g., `f"{symbol} Corp"`) when a company name is unknown, in strict adherence to the **Zero-Mock Data** directive. Raw ticker strings are strictly passed through instead.
+- Added explicit keyword guards in `stockglass_service.py` (`get_stock_detail`) to instantly return 404 `ScanNotFoundError` for non-ticker API URL segment overlaps (e.g., `"DUAL-HORIZON"`, `"FAVORITES"`, `"WATCHLIST"`). This prevents the backend from querying market data providers or the DB for API route pathnames that fell through to the `/{symbol}` wildcard route.
+
+### Optimizer Stability
+- **Duplicate Columns Bug (Pandas):** Removed all reliance on `pandas.DataFrame.stack()` during upper-triangle correlation matrix extraction to fix fatal `ValueError: Columns with duplicate values are not supported in stack` crashes.
+- **Deduplication:** Added explicit `.upper()` deduplication in Step 2 Correlation De-clustering.
+- **Numpy Correlation Extraction:** Extract cross-holding covariance purely via `np.triu_indices_from(corr.values, k=1)` on the raw numeric numpy matrix.
