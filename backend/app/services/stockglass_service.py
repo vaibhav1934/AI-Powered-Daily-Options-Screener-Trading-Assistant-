@@ -385,6 +385,8 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
     Includes layerScores across all 10 layers, reasons, and news.
     """
     symbol = symbol.upper()
+    if symbol in ("DUAL-HORIZON", "DUAL_HORIZON", "FAVORITES", "WATCHLIST"):
+        raise ScanNotFoundError(message=f"Invalid ticker symbol '{symbol}'.")
     
     target_date = await _get_latest_scan_date(session) or date.today()
     start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
@@ -402,13 +404,13 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
     
     # Real name and sector from market_data stored at scan time or StockUniverse
     mdata = (scan.factor_results_json or {}).get("market_data", {}) if scan else {}
-    real_name = mdata.get("name") or f"{symbol} Corp"
+    real_name = mdata.get("name") or symbol
     real_sector = mdata.get("sector") or "Unknown"
     
     u = (await session.execute(select(StockUniverse).where(StockUniverse.ticker == symbol))).scalar_one_or_none()
     if u:
-        if not real_name or real_name == f"{symbol} Corp":
-            real_name = u.name or f"{symbol} Corp"
+        if not real_name or real_name == symbol:
+            real_name = u.name or symbol
         if not real_sector or real_sector == "Unknown":
             real_sector = u.sector or "Unknown"
 
