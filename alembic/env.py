@@ -6,6 +6,7 @@ Loads database URL from app config. Supports async migrations via asyncpg.
 
 import asyncio
 from logging.config import fileConfig
+from urllib.parse import urlparse
 
 from alembic import context
 from sqlalchemy import pool
@@ -52,10 +53,19 @@ def do_run_migrations(connection):  # type: ignore[no-untyped-def]
 
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
+    parsed = urlparse(settings.database.database_url)
+    host = (parsed.hostname or "").lower()
+    is_supabase_pooler = "pooler.supabase.com" in host
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=(
+            {"ssl": "require", "statement_cache_size": 0}
+            if is_supabase_pooler
+            else {}
+        ),
     )
 
     async with connectable.connect() as connection:

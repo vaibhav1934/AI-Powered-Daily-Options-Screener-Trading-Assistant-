@@ -8,6 +8,7 @@ advisories for paper-trading positions. Outputs are advisory-only.
 from __future__ import annotations
 
 import asyncio
+import copy
 import math
 import re
 from dataclasses import dataclass
@@ -44,6 +45,10 @@ DEFAULT_WEIGHTS: dict[str, float] = {
 SINGLE_NAME_CAP = 0.10
 SECTOR_CAP = 0.30
 CORR_TRIGGER = 0.75
+
+
+_weekly_optimization_cache: dict[tuple[int, str], PortfolioOptimizationResponseSchema] = {}
+_weekly_optimization_cache_lock = asyncio.Lock()
 
 
 @dataclass
@@ -570,10 +575,24 @@ async def get_portfolio_score(
 
     # 6) Liquidity Score
     liquid_notional = 0.0
+    option_liquid_notional = 0.0
+    option_illiquid_count = 0
+    option_liquid_count = 0
     for snap in snapshots:
         sym = snap.position.symbol.upper()
         if _parse_option_symbol(sym):
-            # Option liquidity is audited through optimization action step using OI check.
+            chain = await _get_option_chain_liquidity(sym)
+            if chain is None:
+                option_illiquid_count += 1
+                continue
+            contracts = abs(float(snap.position.qty))
+            oi = float(chain.get("open_interest") or 0.0)
+            vol = float(chain.get("volume") or 0.0)
+            if oi > 0 and vol > 0 and contracts <= (oi * 0.20):
+                option_liquid_notional += snap.market_value
+                option_liquid_count += 1
+            else:
+                option_illiquid_count += 1
             continue
         h = history.get(sym)
         if h is None or h.empty:
@@ -600,7 +619,8 @@ async def get_portfolio_score(
         if days_to_exit <= 1.0 and slippage_proxy < 0.02:
             liquid_notional += snap.market_value
 
-    liquidity_score = _clamp((liquid_notional / total_value) * 100.0 if total_value > 0 else 0.0)
+    liquidity_numerator = liquid_notional + option_liquid_notional
+    liquidity_score = _clamp((liquidity_numerator / total_value) * 100.0 if total_value > 0 else 0.0)
     components.append(
         PortfolioComponentScoreSchema(
             name="Liquidity Score",
@@ -610,6 +630,8 @@ async def get_portfolio_score(
             detail="Percent of book that can be exited within 1 day under slippage threshold.",
         )
     )
+    metrics["option_liquid_positions"] = option_liquid_count
+    metrics["option_illiquid_positions"] = option_illiquid_count
 
     # 7) Conviction Alignment
     conv_map = await _get_conviction_scores(session, symbols)
@@ -707,6 +729,19 @@ async def get_portfolio_optimization(
     cadence: str = "weekly",
     custom_weights: Optional[dict[str, float]] = None,
 ) -> PortfolioOptimizationResponseSchema:
+    cadence_normalized = (cadence or "weekly").strip().lower()
+    if cadence_normalized not in {"weekly", "regime_shift"}:
+        cadence_normalized = "weekly"
+
+    week_key = datetime.now(timezone.utc).strftime("%G-W%V")
+    cache_key = (int(user_id), week_key)
+
+    if cadence_normalized == "weekly":
+        async with _weekly_optimization_cache_lock:
+            cached = _weekly_optimization_cache.get(cache_key)
+            if cached is not None:
+                return copy.deepcopy(cached)
+
     score = await get_portfolio_score(session, user_id, custom_weights=custom_weights)
 
     snapshots, total_value = await _get_position_snapshots(session, user_id)
@@ -989,10 +1024,37 @@ async def get_portfolio_optimization(
     # Step 8 output ranking
     actions = sorted(actions, key=lambda a: a.priority)
 
-    return PortfolioOptimizationResponseSchema(
+    acted_symbols = {a.symbol for a in actions if a.symbol}
+    hold_priority = 900
+    for snap in snapshots:
+        symbol = snap.position.symbol.upper()
+        if symbol in acted_symbols:
+            continue
+        actions.append(
+            PortfolioActionSchema(
+                priority=hold_priority,
+                action="HOLD",
+                symbol=symbol,
+                trigger="no_rebalance_trigger",
+                reason="No optimization trigger fired for this holding in the current pass.",
+                metrics={
+                    "weight": round(snap.weight, 4),
+                    "conviction": round(conv_map.get(symbol, 5.0), 2),
+                },
+            )
+        )
+        hold_priority += 1
+
+    result = PortfolioOptimizationResponseSchema(
         asOf=datetime.now(timezone.utc).isoformat(),
-        cadence=cadence,
+        cadence=cadence_normalized,
         triggeredSteps=sorted(set(triggered_steps)),
         actions=actions,
         score=score,
     )
+
+    if cadence_normalized == "weekly":
+        async with _weekly_optimization_cache_lock:
+            _weekly_optimization_cache[cache_key] = copy.deepcopy(result)
+
+    return result

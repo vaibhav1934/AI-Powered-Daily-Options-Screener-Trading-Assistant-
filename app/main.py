@@ -19,7 +19,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.api.router import api_router, root_api_router
 from app.core.config import get_settings
@@ -56,6 +56,18 @@ def _is_allowed_dev_origin(origin: str) -> bool:
     return bool(LOCAL_ORIGIN_PATTERN.match(origin or ""))
 
 
+def _apply_dev_cors_headers(request: Request, response: JSONResponse) -> JSONResponse:
+    """Ensure localhost origins receive CORS headers even on handled exceptions."""
+    origin = request.headers.get("origin", "")
+    if origin and _is_allowed_dev_origin(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        vary = response.headers.get("Vary", "")
+        if "Origin" not in vary:
+            response.headers["Vary"] = f"{vary}, Origin".strip(", ")
+    return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — startup and shutdown events."""
@@ -76,6 +88,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+            # Guard against migration drift: ensure positions.user_id exists before
+            # any portfolio query path that filters by user ownership.
+            await conn.execute(text("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'positions'
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'user_id'
+                ) THEN
+                    ALTER TABLE public.positions ADD COLUMN user_id integer NULL;
+                END IF;
+
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'user_id'
+                ) THEN
+                    CREATE INDEX IF NOT EXISTS ix_positions_user_id ON public.positions (user_id);
+                END IF;
+            END
+            $$;
+            """))
         logger.info("Database schema initialized successfully")
     except Exception as e:
         logger.error("Failed to initialize database schema: %s", str(e))
@@ -174,6 +212,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if scheduler is not None:
         scheduler.shutdown(wait=False)
         logger.info("Portfolio scheduler stopped")
+    await engine.dispose()
+    logger.info("Database engine disposed")
     logger.info("Shutting down Options Screener")
 
 
@@ -265,10 +305,10 @@ def create_app() -> FastAPI:
             trace_id=exc.trace_id,
             path=str(request.url),
         )
-        return JSONResponse(
+        return _apply_dev_cors_headers(request, JSONResponse(
             status_code=exc.status_code,
             content=exc.to_response(),
-        )
+        ))
     import sqlalchemy.exc
     import socket
 
@@ -285,7 +325,7 @@ def create_app() -> FastAPI:
             trace_id=trace_id,
             path=str(request.url),
         )
-        return JSONResponse(
+        return _apply_dev_cors_headers(request, JSONResponse(
             status_code=503,
             content={
                 "error": {
@@ -294,7 +334,7 @@ def create_app() -> FastAPI:
                     "trace_id": trace_id,
                 }
             },
-        )
+        ))
 
     @app.exception_handler(Exception)
     async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -326,7 +366,7 @@ def create_app() -> FastAPI:
             path=str(request.url),
             exc_info=True,
         )
-        return JSONResponse(
+        return _apply_dev_cors_headers(request, JSONResponse(
             status_code=500,
             content={
                 "error": {
@@ -335,7 +375,7 @@ def create_app() -> FastAPI:
                     "trace_id": trace_id,
                 }
             },
-        )
+        ))
 
     # Register versioned API routes
     app.include_router(api_router)

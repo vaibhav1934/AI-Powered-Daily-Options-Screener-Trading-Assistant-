@@ -255,6 +255,16 @@ class FinnhubClient:
             )
             if isinstance(data, list):
                 return [d for d in data if isinstance(d, dict)]
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code if e.response is not None else None
+            if status in (401, 403):
+                logger.info(
+                    "Analyst actions unavailable for %s due to Finnhub permission/tier restriction (HTTP %s)",
+                    ticker,
+                    status,
+                )
+                return []
+            logger.warning("Failed to fetch analyst actions for %s: %s", ticker, e)
         except Exception as e:
             logger.warning("Failed to fetch analyst actions for %s: %s", ticker, e)
         return []
