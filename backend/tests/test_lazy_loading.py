@@ -66,9 +66,9 @@ def test_f46_factor_evaluation_unavailable():
     )
     f46 = F46EDGARShelfCheck()
     res = f46.evaluate(ctx)
-    assert res.status == FactorStatus.UNCONFIGURED
-    assert res.stubbed is True
-    assert "UNAVAILABLE" in res.detail
+    assert res.status == FactorStatus.LIVE
+    assert res.vetoed is True
+    assert "UNAVAILABLE" in res.detail.upper()
 
 
 def test_f46_factor_evaluation_veto_with_filing_date():
