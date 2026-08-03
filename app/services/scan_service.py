@@ -735,18 +735,8 @@ async def _trigger_scan_impl(
             async with sem:
                 async with async_session_factory() as task_session:
                     try:
-                        quote = await client.get_quote(entry.ticker, session=task_session)
-                        gap = quote.change_percent
-                        tech_data = await fetch_technicals(entry.ticker, quote.current_price, task_session)
-                        fundamentals = await get_fundamentals(entry.ticker)
                         profile = await client.get_company_profile(entry.ticker, session=task_session)
-                        ticker_news = await client.get_news(ticker=entry.ticker, session=task_session)
-                        analyst_actions = await client.get_upgrade_downgrade_actions(entry.ticker, session=task_session)
-                        earnings_history = await client.get_company_earnings_history(entry.ticker, session=task_session)
-                        analyst_rating_change, analyst_firm_tier = _infer_analyst_signal(analyst_actions)
-                        catalyst_flags = _extract_ticker_catalyst_flags(ticker_news)
-                        sector_signals = await fetch_free_sector_signals(entry.ticker, profile.get("sector") or "Unknown")
-
+                        
                         # Finnhub company profile market cap is in millions USD.
                         market_cap_usd = _parse_market_cap_to_usd(profile.get("market_cap"), numeric_unit="millions")
                         if market_cap_usd is None or market_cap_usd < MIN_MARKET_CAP_USD:
@@ -761,6 +751,17 @@ async def _trigger_scan_impl(
                                 "ticker": entry.ticker,
                                 "market_cap_usd": market_cap_usd,
                             }
+
+                        quote = await client.get_quote(entry.ticker, session=task_session)
+                        gap = quote.change_percent
+                        tech_data = await fetch_technicals(entry.ticker, quote.current_price, task_session)
+                        fundamentals = await get_fundamentals(entry.ticker)
+                        ticker_news = await client.get_news(ticker=entry.ticker, session=task_session)
+                        analyst_actions = await client.get_upgrade_downgrade_actions(entry.ticker, session=task_session)
+                        earnings_history = await client.get_company_earnings_history(entry.ticker, session=task_session)
+                        analyst_rating_change, analyst_firm_tier = _infer_analyst_signal(analyst_actions)
+                        catalyst_flags = _extract_ticker_catalyst_flags(ticker_news)
+                        sector_signals = await fetch_free_sector_signals(entry.ticker, profile.get("sector") or "Unknown")
                         
                         # Format volume as readable string
                         vol = quote.volume or 0
@@ -1141,6 +1142,10 @@ async def evaluate_and_persist_on_demand(
     Run on-demand 50-factor evaluation for a single ticker that was missed by morning batch scan.
     Persists DailyScan and 50 FactorLog entries to Postgres for same-day caching.
     """
+    if symbol.upper() in ("DUAL-HORIZON", "DUAL_HORIZON", "FAVORITES", "WATCHLIST"):
+        logger.warning("evaluate_and_persist_on_demand explicitly blocking meta-ticker: %s", symbol)
+        return None
+
     try:
         from app.core.market_data.technicals import fetch_technicals
         from app.core.market_data.finnhub import FinnhubClient

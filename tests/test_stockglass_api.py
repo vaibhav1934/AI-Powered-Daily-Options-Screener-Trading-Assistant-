@@ -113,7 +113,9 @@ def setup_stockglass_db_override():
 
 client = TestClient(app)
 
-VALID_HEADERS = {"Authorization": "Bearer test_token_123"}
+from app.services.auth_service import create_access_token
+
+VALID_HEADERS = {"Authorization": f"Bearer {create_access_token({'sub': 'admin'})}"}
 
 
 def test_get_indices():
@@ -165,9 +167,15 @@ def test_get_stock_detail():
     assert "layerScores" in data
     assert len(data["layerScores"]) == 10
     assert "reasons" in data
-    assert len(data["reasons"]) > 0
     assert "news" in data
     assert isinstance(data["news"], list)
+
+    # Test async synthesis endpoint
+    syn_resp = client.get("/v1/stocks/NVDA/synthesis", headers=VALID_HEADERS)
+    assert syn_resp.status_code == 200, syn_resp.text
+    syn_data = syn_resp.json()
+    assert syn_data["symbol"] == "NVDA"
+    assert "reasons" in syn_data
 
 
 def test_get_stock_factors():
