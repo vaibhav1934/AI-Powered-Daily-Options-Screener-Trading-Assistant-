@@ -61,7 +61,7 @@ export function ScreenerTable({
   }, [viewMode]);
 
   const tabs: Array<{ id: ViewMode; label: string }> = [
-    { id: "TACTICAL_30D", label: "⚡ 30-Day Tactical Setups" },
+    { id: "TACTICAL_30D", label: "🔥 Top 20 Trending Stocks Today" },
     { id: "LONG_TERM", label: "🏛️ Long-Term Accumulation" },
     { id: "ALL_STOCKS", label: "All Universe" },
   ] as const;

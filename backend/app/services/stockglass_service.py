@@ -1000,24 +1000,27 @@ async def get_dual_horizon_lists(session: AsyncSession) -> DualHorizonListRespon
     for scan in scans:
         payload = scan.factor_results_json or {}
         dual = payload.get("dual_horizon", {}) if isinstance(payload, dict) else {}
-        tactical = dual.get("tactical", {}) if isinstance(dual, dict) else {}
         long_term = dual.get("long_term", {}) if isinstance(dual, dict) else {}
 
         mdata = payload.get("market_data", {}) if isinstance(payload, dict) else {}
         univ = univ_map.get(scan.ticker)
         name = (mdata.get("name") if isinstance(mdata, dict) else None) or (univ.name if univ else scan.ticker)
         sector = (mdata.get("sector") if isinstance(mdata, dict) else None) or (univ.sector if univ else "Unknown")
+        
+        market_cap_usd = mdata.get("market_cap_usd")
+        if market_cap_usd is not None and market_cap_usd < 1_000_000_000:
+            continue
 
-        tactical_score = tactical.get("score") if isinstance(tactical.get("score"), (int, float)) else None
-        tactical_valid = isinstance(tactical_score, (int, float)) and math.isfinite(float(tactical_score))
-        if bool(tactical.get("regime_gate_pass")) and tactical_valid:
+        # List 1: Top 20 Trending Stocks (Formerly 30-Day Tactical)
+        # The query is already ordered by DailyScan.score desc. We just take the top 20.
+        if scan.score and scan.score > 0 and len(tactical_rows) < 20:
             tactical_rows.append(
                 FrameworkCandidateSchema(
                     symbol=scan.ticker,
                     name=name,
                     sector=sector,
-                    score=round(float(tactical_score), 1),
-                    sizingCap=tactical.get("sizing_cap") if isinstance(tactical.get("sizing_cap"), str) else None,
+                    score=round(float(scan.score), 1),
+                    sizingCap=None,
                     regimeGate="PASS",
                 )
             )

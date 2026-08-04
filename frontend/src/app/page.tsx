@@ -52,7 +52,7 @@ export default function StockGlassProDashboard() {
 
   // --- UI Filter & Navigation State ---
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("ALL_STOCKS");
+  const [viewMode, setViewMode] = useState<ViewMode>("TACTICAL_30D");
   const [activeSector, setActiveSector] = useState("");
   const [riskBucket, setRiskBucket] = useState("");
   const [minScore, setMinScore] = useState(0);
