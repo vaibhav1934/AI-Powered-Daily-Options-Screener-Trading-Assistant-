@@ -78,6 +78,14 @@ Paper trading position creation was updated to support both underlying stocks an
 2. **Dual-button execution:** Detail Panel surfaces both `+ Paper Stock` (underlying stock at live price) and `+ Paper Option` (option contract at target strike price).
 3. **Portfolio Greeks integration:** When an OCC-formatted option position is created, the backend `portfolio_management_service` parses the symbol root, expiration, call/put type, and strike, automatically computing Black-Scholes **Delta**, **Theta**, and **Vega** for Component 5 (*Options Greek Exposure*) of the Portfolio Score.
 
+### Implementation Update (2026-08-05): Continuous Scanning & 7-Day Rolling Window
+
+To support scaling across the entire market universe (> $1B Market Cap) within free-tier API rate limits:
+1. **Continuous Background Scanner:** The backend now runs a continuous daemon loop inside the FastAPI lifecycle, pulling 5 tickers per batch and dynamically sleeping based on the `RateLimiterRegistry` to strictly avoid Finnhub `429 Too Many Requests` errors.
+2. **7-Day Rolling Window Queries:** Because scanning the entire market takes time, the dual horizon (`/v1/stocks/dual-horizon`) and universe (`/v1/stocks`) queries were rewritten to use a subquery that fetches `MAX(scan_date) GROUP BY ticker` over the last 7 days. This ensures that the single freshest evaluation for every ticker is presented to the user.
+3. **Top 20 Trending List:** The former "30-Day Tactical Setups" list was converted into the "Top 20 Trending Stocks" list. It evaluates the entire universe, enforces the > $1B Market Cap requirement (which is hardcoded at the scanner engine level), and limits output to the top 20 highest scores.
+4. **Pagination Default:** The Screener is configured to display exactly 10 items per page and is strictly sorted descending by the AI computed score, bypassing alphabetical sorting.
+
 ### Multi-User Privacy Isolation (JWT-Scoped)
 
 StockGlass AI now enforces user-scoped privacy boundaries for portfolio and chat data paths:
