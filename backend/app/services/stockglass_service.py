@@ -10,11 +10,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from typing import Any, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -181,13 +181,25 @@ async def get_stock_list(
     Get screener table stock list matching API Contract v1 with pagination.
     Enforces FR-7 by ensuring execution details are excluded while screening market data is shown.
     """
-    target_date = await _get_latest_scan_date(session) or date.today()
-    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
-    logger.info("[FLOW: Service Layer] ──> get_stock_list: Querying DB DailyScan for date >= %s (filters: list=%s, sector=%s, minScore=%s)", target_date, list_param, sector, min_score)
+    target_date = datetime.now(timezone.utc) - timedelta(days=7)
+    logger.info("[FLOW: Service Layer] ──> get_stock_list: Querying DB DailyScan for 7-day rolling window >= %s (filters: list=%s, sector=%s, minScore=%s)", target_date.date(), list_param, sector, min_score)
+    
+    subq = (
+        select(DailyScan.ticker, func.max(DailyScan.scan_date).label("max_date"))
+        .where(DailyScan.scan_date >= target_date)
+        .group_by(DailyScan.ticker)
+        .subquery()
+    )
     
     stmt = (
         select(DailyScan)
-        .where(DailyScan.scan_date >= start_dt)
+        .join(
+            subq,
+            and_(
+                DailyScan.ticker == subq.c.ticker,
+                DailyScan.scan_date == subq.c.max_date
+            )
+        )
         .order_by(DailyScan.score.desc())
     )
     
@@ -974,12 +986,24 @@ async def get_stock_synthesis(session: AsyncSession, symbol: str) -> StockSynthe
 
 async def get_dual_horizon_lists(session: AsyncSession) -> DualHorizonListResponseSchema:
     """Return independent 30-day tactical and long-term lists from latest scan data."""
-    target_date = await _get_latest_scan_date(session) or date.today()
-    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+    target_date = datetime.now(timezone.utc) - timedelta(days=7)
+    
+    subq = (
+        select(DailyScan.ticker, func.max(DailyScan.scan_date).label("max_date"))
+        .where(DailyScan.scan_date >= target_date)
+        .group_by(DailyScan.ticker)
+        .subquery()
+    )
 
     stmt = (
         select(DailyScan)
-        .where(DailyScan.scan_date >= start_dt)
+        .join(
+            subq,
+            and_(
+                DailyScan.ticker == subq.c.ticker,
+                DailyScan.scan_date == subq.c.max_date
+            )
+        )
         .order_by(DailyScan.score.desc())
     )
     scans = list((await session.execute(stmt)).scalars().all())
