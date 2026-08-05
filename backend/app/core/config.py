@@ -236,6 +236,11 @@ class AppConfig(BaseSettings):
     # Pre-market scan schedule (CST, 24h)
     scan_schedule_hour: int = Field(default=6)
     scan_schedule_minute: int = Field(default=30)
+    
+    # Continuous Scan schedule (Rate-limit respecting)
+    scan_continuous_enabled: bool = Field(default=True)
+    scan_batch_size: int = Field(default=5)
+    scan_interval_seconds: int = Field(default=30)
 
     # Portfolio maintenance schedule (CST)
     portfolio_scheduler_enabled: bool = Field(default=True)
