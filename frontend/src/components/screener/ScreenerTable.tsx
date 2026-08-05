@@ -391,7 +391,7 @@ export function ScreenerTable({
       </div>
 
       <div>
-        {currentTotalPages > 1 && (
+        {currentTotalPages > 0 && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20, padding: "12px 0 4px", borderTop: "1px solid #e8eaed" }}>
             <div style={{ fontSize: 13, color: "#5f6368" }}>
               Page <span style={{ fontWeight: 600, color: "#202124" }}>{currentPage}</span> of <span style={{ fontWeight: 600, color: "#202124" }}>{currentTotalPages}</span>
