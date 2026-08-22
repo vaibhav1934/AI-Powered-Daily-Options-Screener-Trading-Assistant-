@@ -61,9 +61,8 @@ export function ScreenerTable({
   }, [viewMode]);
 
   const tabs: Array<{ id: ViewMode; label: string }> = [
-    { id: "TACTICAL_30D", label: "🔥 Top 20 Trending Stocks Today" },
-    { id: "LONG_TERM", label: "🏛️ Long-Term Accumulation" },
     { id: "ALL_STOCKS", label: "All Universe" },
+    { id: "EARNINGS_TODAY", label: "⚡ Earnings Today" },
   ] as const;
 
   const horizonSource = viewMode === "TACTICAL_30D" ? tacticalItems : longTermItems;
@@ -79,7 +78,7 @@ export function ScreenerTable({
     return sortedHorizon.slice(start, start + PAGE_SIZE);
   }, [sortedHorizon, horizonPage]);
 
-  const isAllMode = viewMode === "ALL_STOCKS";
+  const isAllMode = viewMode === "ALL_STOCKS" || viewMode === "EARNINGS_TODAY";
   const displayTotal = isAllMode ? (totalCount > 0 ? totalCount : items.length) : sortedHorizon.length;
   const currentPage = isAllMode ? page : horizonPage;
   const currentTotalPages = isAllMode ? totalPages : horizonTotalPages;

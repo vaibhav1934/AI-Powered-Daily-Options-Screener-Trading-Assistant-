@@ -52,7 +52,7 @@ export default function StockGlassProDashboard() {
 
   // --- UI Filter & Navigation State ---
   const [query, setQuery] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("TACTICAL_30D");
+  const [viewMode, setViewMode] = useState<ViewMode>("ALL_STOCKS");
   const [activeSector, setActiveSector] = useState("");
   const [riskBucket, setRiskBucket] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -76,13 +76,13 @@ export default function StockGlassProDashboard() {
 
   const pageCacheRef = useRef<Record<string, { items: StockListItem[]; totalPages: number; totalCount: number }>>({});
   const getCacheKey = useCallback(
-    (page: number) => JSON.stringify({ activeSector, riskBucket, minScore, activeQuick, query, page }),
-    [activeSector, riskBucket, minScore, activeQuick, query]
+    (page: number) => JSON.stringify({ viewMode, activeSector, riskBucket, minScore, activeQuick, query, page }),
+    [viewMode, activeSector, riskBucket, minScore, activeQuick, query]
   );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeSector, riskBucket, minScore, activeQuick, query]);
+  }, [viewMode, activeSector, riskBucket, minScore, activeQuick, query]);
 
   // --- AI Chat State ---
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -209,6 +209,7 @@ export default function StockGlassProDashboard() {
       if (activeSector) params.sector = activeSector;
       if (riskBucket) params.riskBucket = riskBucket;
       if (minScore > 0) params.minScore = minScore;
+      if (viewMode === "EARNINGS_TODAY") params.earningsSoon = true;
       if (activeQuick === "gainers") params.direction = "gainers";
       if (activeQuick === "losers") params.direction = "losers";
       if (activeQuick === "earningsSoon") params.earningsSoon = true;
@@ -250,7 +251,7 @@ export default function StockGlassProDashboard() {
     } finally {
       setLoadingStocks(false);
     }
-  }, [activeSector, riskBucket, minScore, activeQuick, query, currentPage, getCacheKey]);
+  }, [viewMode, activeSector, riskBucket, minScore, activeQuick, query, currentPage, getCacheKey]);
 
   useEffect(() => {
     loadStocks();
@@ -618,6 +619,16 @@ export default function StockGlassProDashboard() {
           </div>
         </div>
       )}
+
+      {/* Persistent Compliance & Publisher Exemption Footer Banner */}
+      <footer style={{ borderTop: "1px solid #e8eaed", background: "#f8f9fa", padding: "6px 20px", fontSize: 11, color: "#5f6368", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <span>
+          <strong>Disclaimer:</strong> For educational, market research, and informational purposes only. Not investment, tax, or legal advice. No personalized recommendations.
+        </span>
+        <span style={{ fontSize: 10, color: "#80868b" }}>
+          Live Market Feeds: Polygon.io • SEC EDGAR • Finnhub
+        </span>
+      </footer>
 
       {/* Full 50-Factor Log Modal */}
       {showFactors && (

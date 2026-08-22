@@ -335,6 +335,9 @@ User Query: ${textToSend}`,
             </button>
           ))}
         </div>
+        <div style={{ marginTop: 8, fontSize: 10.5, color: "#80868b", textAlign: "center" }}>
+          AI Market Assistant provides general technical and market commentary. Not financial advice.
+        </div>
       </div>
     </div>
   );

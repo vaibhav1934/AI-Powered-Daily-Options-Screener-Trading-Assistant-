@@ -4,8 +4,21 @@ import { StockDetail, StockSynthesis } from "@/types/stockglass";
 import { fetchStockSynthesis } from "@/lib/stockglass_api";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { scoreColor } from "./ScreenerRow";
-import { ExternalLink, Info, Newspaper, Sparkles, Upload, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import {
+  ExternalLink,
+  Info,
+  Newspaper,
+  Sparkles,
+  Upload,
+  AlertCircle,
+  Loader2,
+  Activity,
+  TrendingUp,
+  Compass,
+  ShieldAlert,
+} from "lucide-react";
 import { uploadOptionsChainScreenshot } from "@/lib/api";
+import { TechnicalIndicatorHubModal } from "./TechnicalIndicatorHubModal";
 
 const reasonColor: Record<string, string> = { bull: "#188038", bear: "#c5221f", neutral: "#5f6368" };
 
@@ -50,6 +63,7 @@ export function DetailPanel({
   const [addingOption, setAddingOption] = useState(false);
   const [paperMessage, setPaperMessage] = useState<string | null>(null);
   const [paperError, setPaperError] = useState<string | null>(null);
+  const [showHubModal, setShowHubModal] = useState(false);
 
   useEffect(() => {
     if (detail) {
@@ -107,7 +121,7 @@ export function DetailPanel({
     return (
       <div style={{ borderLeft: "1px solid #e8eaed", padding: 40, width: "100%", flexShrink: 0, background: "#fff", textAlign: "center", color: "#5f6368" }}>
         <p style={{ fontSize: 16, fontWeight: 500, color: "#202124" }}>Select a Setup</p>
-        <p style={{ fontSize: 13, marginTop: 4 }}>Click any row on the left to see why it scored the way it did.</p>
+        <p style={{ fontSize: 13, marginTop: 4 }}>Click any row on the left to review observed technical indicators and factor data.</p>
       </div>
     );
   }
@@ -126,9 +140,9 @@ export function DetailPanel({
     return (
       <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%" }}>
         <Loader2 size={36} className="animate-spin" style={{ color: "#1a73e8", marginBottom: 16 }} />
-        <p style={{ fontSize: 18, fontWeight: 600, color: "#202124" }}>Analyzing Setup...</p>
+        <p style={{ fontSize: 18, fontWeight: 600, color: "#202124" }}>Aggregating Technical Data...</p>
         <p style={{ fontSize: 14, color: "#5f6368", textAlign: "center", marginTop: 8, maxWidth: 280, lineHeight: 1.5 }}>
-          This may take a moment while StockGlass AI synthesizes live news, options flow, and factor data.
+          Fetching moving averages, 52W extremes, news catalysts, and options factor data.
         </p>
       </div>
     );
@@ -149,69 +163,128 @@ export function DetailPanel({
 
   return (
     <div style={{ borderLeft: "1px solid #e8eaed", padding: 20, width: "100%", flexShrink: 0, background: "#fff", overflowY: "auto", height: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      {/* Top Header: Symbol, Company, Sector, Signal Score */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 500, color: "#202124" }}>{detail.symbol}</div>
-          <div style={{ fontSize: 13, color: "#5f6368" }}>{detail.name}</div>
-        </div>
-        <span style={{ background: sc.bg, color: sc.fg, fontSize: 13, fontWeight: 700, padding: "4px 10px", borderRadius: 14 }}>
-          {detail.score.toFixed(1)}
-        </span>
-      </div>
-
-      <div style={{ fontSize: 26, fontWeight: 500, marginTop: 10, color: "#202124" }}>
-        ${detail.price.toFixed(2)}
-      </div>
-
-      <div style={{ fontSize: 13, color: isPos ? "#188038" : "#c5221f", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-        <span>{isPos ? "+" : ""}{detail.chg.toFixed(2)} ({detail.pct.toFixed(2)}%)</span>
-        {detail.volume && <span style={{ color: "#5f6368", background: "#f1f3f4", padding: "2px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>Vol: {detail.volume}</span>}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5f6368", background: "#f8f9fa", borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
-        <div>
-          Support<br />
-          <span style={{ color: "#202124", fontWeight: 600, fontSize: 13 }}>${support.toFixed(2)}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 22, fontWeight: 700, color: "#202124" }}>{detail.symbol}</span>
+            <span style={{ fontSize: 11, background: "#f1f3f4", color: "#5f6368", padding: "2px 8px", borderRadius: 12, fontWeight: 600 }}>
+              {detail.sector}
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: "#5f6368", marginTop: 2 }}>{detail.name}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          Resistance<br />
-          <span style={{ color: "#202124", fontWeight: 600, fontSize: 13 }}>${resistance.toFixed(2)}</span>
+          <div style={{ background: sc.bg, color: sc.fg, fontSize: 13, fontWeight: 700, padding: "4px 10px", borderRadius: 14, display: "inline-block" }}>
+            Signal: {detail.score.toFixed(1)} / 10
+          </div>
+          <div style={{ fontSize: 10, color: "#80868b", marginTop: 2 }}>Factor Model Alignment</div>
         </div>
       </div>
 
-      {/* Execution Parameters & Vision Options Scanner Card */}
+      {/* Price & Daily Change */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 10 }}>
+        <span style={{ fontSize: 26, fontWeight: 700, color: "#202124" }}>${detail.price.toFixed(2)}</span>
+        <span style={{ fontSize: 13, color: isPos ? "#188038" : "#c5221f", fontWeight: 600 }}>
+          {isPos ? "+" : ""}{detail.chg.toFixed(2)} ({detail.pct.toFixed(2)}%)
+        </span>
+        {detail.volume && (
+          <span style={{ color: "#5f6368", background: "#f1f3f4", padding: "2px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
+            Vol: {detail.volume}
+          </span>
+        )}
+      </div>
+
+      {/* Quick Technical Indicator Highlights Card */}
+      <div style={{ background: "#f8f9fa", borderRadius: 8, padding: "10px 12px", marginTop: 12, marginBottom: 14, border: "1px solid #e8eaed" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11.5 }}>
+          <div>
+            <span style={{ color: "#5f6368" }}>200-Day SMA:</span>{" "}
+            <span style={{ fontWeight: 600, color: "#202124" }}>
+              {detail.sma_200 ? `$${detail.sma_200.toFixed(2)}` : "Evaluating"}
+            </span>
+          </div>
+          <div>
+            <span style={{ color: "#5f6368" }}>Observed S / R:</span>{" "}
+            <span style={{ fontWeight: 600, color: "#202124" }}>
+              ${support.toFixed(2)} / ${resistance.toFixed(2)}
+            </span>
+          </div>
+          <div>
+            <span style={{ color: "#5f6368" }}>52W Range:</span>{" "}
+            <span style={{ fontWeight: 600, color: "#202124" }}>
+              {detail.low_52w && detail.high_52w ? `$${detail.low_52w.toFixed(0)} - $${detail.high_52w.toFixed(0)}` : "N/A"}
+            </span>
+          </div>
+          <div>
+            <span style={{ color: "#5f6368" }}>6M Range:</span>{" "}
+            <span style={{ fontWeight: 600, color: "#202124" }}>
+              {detail.low_6m && detail.high_6m ? `$${detail.low_6m.toFixed(0)} - $${detail.high_6m.toFixed(0)}` : "N/A"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Prominent Openable Hub Button (14 Factors) */}
+      <button
+        onClick={() => setShowHubModal(true)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          background: "linear-gradient(135deg, #1a73e8 0%, #174ea6 100%)",
+          color: "#fff",
+          border: "none",
+          borderRadius: 8,
+          padding: "10px 14px",
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          marginBottom: 16,
+          boxShadow: "0 2px 4px rgba(26, 115, 232, 0.2)",
+          transition: "all 0.2s ease",
+        }}
+      >
+        <Activity size={16} /> Open Indicator & Technical Hub (14 Factors)
+      </button>
+
+      {/* Reference Technical Levels & Options Profiler Card */}
       <div style={{ background: "#f8f9fa", borderRadius: 8, padding: "12px 14px", marginBottom: 16, border: "1px solid #e8eaed" }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#202124", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>Execution Parameters</span>
-          <span style={{ fontSize: 10, background: "#e8f0fe", color: "#1a73e8", padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>Zero-Mock Data</span>
+          <span>Reference Technical Levels</span>
+          <span style={{ fontSize: 10, background: "#e8f0fe", color: "#1a73e8", padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>
+            Live Market Feed
+          </span>
         </div>
-        
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12, marginBottom: 8 }}>
           <div>
-            <span style={{ color: "#5f6368" }}>Entry Ref:</span><br />
+            <span style={{ color: "#5f6368" }}>Observed Reference:</span><br />
             <span style={{ fontWeight: 600, color: "#202124" }}>${detail.price.toFixed(2)}</span>
           </div>
           <div>
-            <span style={{ color: "#5f6368" }}>Stop Loss:</span><br />
-            <span style={{ fontWeight: 600, color: "#c5221f" }}>${(detail.price * 0.98).toFixed(2)} (MA Ref)</span>
+            <span style={{ color: "#5f6368" }}>Support Reference:</span><br />
+            <span style={{ fontWeight: 600, color: "#188038" }}>${(detail.price * 0.98).toFixed(2)} (MA Ref)</span>
           </div>
         </div>
 
         <div style={{ borderTop: "1px solid #e8eaed", paddingTop: 8 }}>
-          <div style={{ fontSize: 12, color: "#5f6368", marginBottom: 6 }}>Target Strike (30-45 DTE):</div>
+          <div style={{ fontSize: 12, color: "#5f6368", marginBottom: 6 }}>Target Options Strike Reference (30-45 DTE):</div>
           {localStrike ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#e6f4ea", padding: "8px 10px", borderRadius: 6, border: "1px solid #ceead6" }}>
               <span style={{ fontWeight: 700, color: "#137333", fontSize: 13 }}>
                 ${localStrike.toFixed(2)} {aiSelection?.contract_type || "Call/Put"}
               </span>
-              <span style={{ fontSize: 11, color: "#137333", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                <CheckCircle2 size={14} /> AI Confirmed
+              <span style={{ fontSize: 11, color: "#137333", fontWeight: 600 }}>
+                Reference Strike
               </span>
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: 11.5, color: "#d93025", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                <AlertCircle size={14} /> N/A - Requires Options Chain Feed
+              <div style={{ fontSize: 11.5, color: "#5f6368", fontWeight: 500, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                <Info size={14} /> Optional: Scan Live Broker Options Chain
               </div>
               
               <label
@@ -233,7 +306,7 @@ export function DetailPanel({
               >
                 {uploadingChain ? (
                   <>
-                    <Loader2 size={14} className="animate-spin" /> AI Scanning Chain...
+                    <Loader2 size={14} className="animate-spin" /> Scanning Chain Image...
                   </>
                 ) : (
                   <>
@@ -254,7 +327,7 @@ export function DetailPanel({
           {aiSelection && aiSelection.reasoning && (
             <div style={{ marginTop: 8, fontSize: 11, color: "#3c4043", background: "#fff", padding: "10px", borderRadius: 6, border: "1px solid #e8eaed", lineHeight: 1.45 }}>
               <div style={{ fontWeight: 600, color: "#1a73e8", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
-                <Sparkles size={13} /> AI Contract Analysis ({aiSelection.expiration || "35 DTE"} | Delta {aiSelection.delta || "~0.38"}):
+                <Sparkles size={13} /> Options Chain Sensitivity Profile ({aiSelection.expiration || "35 DTE"} | Delta {aiSelection.delta || "~0.38"}):
               </div>
               {aiSelection.reasoning}
               {aiSelection.open_interest && (
@@ -268,7 +341,7 @@ export function DetailPanel({
           {onAddPaperTrade && (
             <div style={{ borderTop: "1px solid #e8eaed", marginTop: 10, paddingTop: 10 }}>
               <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5f6368", marginBottom: 6 }}>
-                Add Position to Paper Portfolio:
+                Simulate in Paper Portfolio:
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
@@ -366,7 +439,8 @@ export function DetailPanel({
         </div>
       </div>
 
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", marginBottom: 6 }}>Layer scores</div>
+      {/* Layer Scores Bar Chart */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", marginBottom: 6 }}>10-Layer Factor Scores</div>
       <ResponsiveContainer width="100%" height={110}>
         <BarChart data={layerData} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
           <XAxis dataKey="layer" tick={{ fontSize: 9, fill: "#80868b" }} interval={0} angle={-35} textAnchor="end" height={40} />
@@ -398,11 +472,12 @@ export function DetailPanel({
         <Info size={14} /> View full 50-factor breakdown <ExternalLink size={12} />
       </button>
 
+      {/* Factor Observations & Synthesis */}
       <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", margin: "10px 0 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span>Why this score</span>
+        <span>Observed Factor Drivers</span>
         {onAskAi && (
           <button
-            onClick={() => onAskAi(`Explain the 50-factor conviction score and bear case for ${detail.symbol}`)}
+            onClick={() => onAskAi(`Summarize technical factor observations and risk characteristics for ${detail.symbol}`)}
             style={{ background: "none", border: "none", color: "#1a73e8", fontSize: 11, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
           >
             <Sparkles size={12} /> Ask AI
@@ -412,7 +487,7 @@ export function DetailPanel({
       
       {loadingSynthesis ? (
         <div style={{ padding: "12px 0", display: "flex", alignItems: "center", gap: 8, color: "#1a73e8", fontSize: 13, fontWeight: 500 }}>
-          <Loader2 size={16} className="animate-spin" /> AI Analyzing Setup...
+          <Loader2 size={16} className="animate-spin" /> Synthesizing factor observations...
         </div>
       ) : reasons.length > 0 ? (
         reasons.map((r: any, i: number) => {
@@ -441,16 +516,17 @@ export function DetailPanel({
         })
       ) : (
         <div style={{ fontSize: 12, color: "#80868b", fontStyle: "italic", marginBottom: 10 }}>
-          No specific vetoes or warnings triggered for this setup.
+          No specific vetoes or risk conditions triggered.
         </div>
       )}
 
+      {/* Sourced News Feed */}
       <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", margin: "14px 0 8px", display: "flex", alignItems: "center", gap: 6 }}>
-        <Newspaper size={13} /> News feeding this score
+        <Newspaper size={13} /> Sourced News & Catalysts
       </div>
       {loadingSynthesis ? (
         <div style={{ padding: "12px 12px", backgroundColor: "#f8fafd", border: "1px solid #e8f0fe", borderRadius: 8, marginBottom: 12, display: "flex", gap: 8, alignItems: "center", color: "#1a73e8", fontSize: 12 }}>
-          <Loader2 size={15} className="animate-spin" /> Synthesizing catalysts...
+          <Loader2 size={15} className="animate-spin" /> Synthesizing market catalysts...
         </div>
       ) : newsSummary ? (
         <div style={{
@@ -466,7 +542,7 @@ export function DetailPanel({
           <Sparkles size={15} color="#1a73e8" style={{ marginTop: 2, flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#1a73e8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
-              AI Catalyst Synthesis
+              Catalyst Context
             </div>
             <div style={{ fontSize: 12.5, color: "#3c4043", lineHeight: 1.4 }}>
               {newsSummary}
@@ -505,6 +581,19 @@ export function DetailPanel({
           No recent news catalysts found.
         </div>
       )}
+
+      {/* Compliance Disclaimer at Bottom of Panel */}
+      <div style={{ marginTop: 24, padding: "10px 12px", background: "#f8f9fa", borderRadius: 8, border: "1px solid #e8eaed", display: "flex", gap: 8, alignItems: "center", fontSize: 11, color: "#5f6368" }}>
+        <ShieldAlert size={14} color="#f2994a" style={{ flexShrink: 0 }} />
+        <span>For educational and market research purposes only. Not investment advice.</span>
+      </div>
+
+      {/* 14-Factor Indicator Hub Modal */}
+      <TechnicalIndicatorHubModal
+        stock={detail}
+        isOpen={showHubModal}
+        onClose={() => setShowHubModal(false)}
+      />
     </div>
   );
 }

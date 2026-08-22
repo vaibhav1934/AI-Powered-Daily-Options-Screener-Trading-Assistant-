@@ -321,6 +321,16 @@ export default function PortfolioPage() {
         </div>
       </div>
       )}
+
+      {/* Persistent Compliance & Publisher Exemption Footer Banner */}
+      <footer style={{ borderTop: "1px solid #e8eaed", background: "#f8f9fa", padding: "10px 20px", fontSize: 11, color: "#5f6368", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
+        <span>
+          <strong>Disclaimer:</strong> For educational, market research, and informational purposes only. Not investment, tax, or legal advice. No personalized recommendations.
+        </span>
+        <span style={{ fontSize: 10, color: "#80868b" }}>
+          Live Market Feeds: Polygon.io • SEC EDGAR • Finnhub
+        </span>
+      </footer>
     </div>
   );
 }

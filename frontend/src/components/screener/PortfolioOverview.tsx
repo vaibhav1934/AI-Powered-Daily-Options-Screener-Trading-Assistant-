@@ -19,7 +19,14 @@ const bandColor: Record<string, { bg: string; fg: string; border: string }> = {
 };
 
 function formatBand(band: string): string {
-  return band.replace(/_/g, " ");
+  const map: Record<string, string> = {
+    WELL_OPTIMIZED: "Balanced Risk Profile",
+    HEALTHY_WITH_FLAGS: "Moderate Concentration",
+    NEEDS_REBALANCING: "High Sector Dispersion",
+    URGENT: "Elevated Single-Stock Risk",
+    DATA_NOT_AVAILABLE: "Awaiting Position Data",
+  };
+  return map[band] || band.replace(/_/g, " ");
 }
 
 export function PortfolioOverview({ score, optimization, loading, error }: PortfolioOverviewProps) {
@@ -55,7 +62,7 @@ export function PortfolioOverview({ score, optimization, loading, error }: Portf
         <div className="portfolio-card-minheight" style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <Gauge size={16} color="#1a73e8" />
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#202124" }}>Portfolio Score</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#202124" }}>Risk Dispersion Score</div>
           </div>
 
           {loading ? (
@@ -139,7 +146,7 @@ export function PortfolioOverview({ score, optimization, loading, error }: Portf
         <div className="portfolio-card-minheight" style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <Target size={16} color="#1a73e8" />
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#202124" }}>Optimizer Actions</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#202124" }}>Factor Insights & Risk Alerts</div>
           </div>
           {loading ? (
             <div style={{ display: "grid", gap: 8 }}>
@@ -151,7 +158,7 @@ export function PortfolioOverview({ score, optimization, loading, error }: Portf
           ) : topActions.length === 0 ? (
             <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "#5f6368", background: "#fff", border: "1px solid #e8eaed", borderRadius: 10, padding: "10px 12px" }}>
               <AlertTriangle size={14} color="#5f6368" />
-              No optimizer actions fired for the current paper book.
+              No risk alerts active for the current paper book.
             </div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>

@@ -21,7 +21,14 @@ const bandColor: Record<string, { bg: string; fg: string; border: string }> = {
 };
 
 function formatBand(band: string): string {
-  return band.replace(/_/g, " ");
+  const map: Record<string, string> = {
+    WELL_OPTIMIZED: "Balanced Risk Profile",
+    HEALTHY_WITH_FLAGS: "Moderate Concentration",
+    NEEDS_REBALANCING: "High Sector Dispersion",
+    URGENT: "Elevated Single-Stock Risk",
+    DATA_NOT_AVAILABLE: "Awaiting Position Data",
+  };
+  return map[band] || band.replace(/_/g, " ");
 }
 
 export function PortfolioSummaryStrip({ score, optimization, loading, error }: PortfolioSummaryStripProps) {
@@ -56,7 +63,7 @@ export function PortfolioSummaryStrip({ score, optimization, loading, error }: P
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <Gauge size={16} color="#1a73e8" />
             <div style={{ fontSize: 12, fontWeight: 700, color: "#202124", textTransform: "uppercase", letterSpacing: 0.4 }}>
-              Portfolio Health
+              Portfolio Risk Alignment
             </div>
           </div>
           {loading ? (
@@ -88,7 +95,7 @@ export function PortfolioSummaryStrip({ score, optimization, loading, error }: P
               <div style={{ fontSize: 12, color: "#5f6368" }}>
                 {score?.missingComponents?.length
                   ? `Missing: ${score.missingComponents.join(", ")}`
-                  : `${actionCount} optimizer action${actionCount === 1 ? "" : "s"} queued`}
+                  : `${actionCount} analytical insight${actionCount === 1 ? "" : "s"}`}
               </div>
             </div>
           )}

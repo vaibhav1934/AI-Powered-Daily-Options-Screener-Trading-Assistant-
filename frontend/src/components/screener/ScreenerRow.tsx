@@ -87,7 +87,7 @@ export function ScreenerRow({
                       border: `1px solid ${sc.border}`,
                     }}
                   >
-                    ★ {item.score.toFixed(1)}
+                    {item.score.toFixed(1)}
                   </span>
                   {item.earningsSoon && (
                     <span style={{ fontSize: 10, background: "#fef7e0", color: "#b06000", borderRadius: 6, padding: "2px 6px" }}>

@@ -86,13 +86,40 @@ To support scaling across the entire market universe (> $1B Market Cap) within f
 3. **Top 20 Trending List:** The former "30-Day Tactical Setups" list was converted into the "Top 20 Trending Stocks" list. It evaluates the entire universe, enforces the > $1B Market Cap requirement (which is hardcoded at the scanner engine level), and limits output to the top 20 highest scores.
 4. **Pagination Default:** The Screener is configured to display exactly 10 items per page and is strictly sorted descending by the AI computed score, bypassing alphabetical sorting.
 
-### Multi-User Privacy Isolation (JWT-Scoped)
+### Implementation Update (2026-08-22): Publisher Exemption Compliance, 14-Factor Technical Hub & Universe Tabs
 
-StockGlass AI now enforces user-scoped privacy boundaries for portfolio and chat data paths:
-1. **Portfolio isolation:** All paper-trading positions and derived portfolio analytics are scoped by authenticated user identity (`users.id`).
-2. **Chat isolation:** GenAI conversation memory is namespaced by authenticated user identity and conversation id, preventing cross-user history leakage.
-3. **JWT-required privacy routes:** Privacy-sensitive routes (`/v1/positions*`, `/v1/portfolio/score`, `/v1/portfolio/optimize`, `/v1/chat*`) require bearer-authenticated users and do not permit API-key-only access.
-4. **Legacy unowned positions:** Pre-migration rows without ownership are excluded from user-scoped reads and do not appear in any authenticated user's portfolio views.
+To target and maintain full compliance with the **Investment Advisers Act Publisher Exemption** and satisfy editorial feedback from legal review:
+1. **Publisher Exemption Framing & Elimination of Personalized Recommendations:**
+   - Replaced prescriptive terms (*"Execution Parameters"*, *"Stop Loss"* advice, *"AI Confirmed Strike"*) with neutral, observed technical market reference points (*"Reference Technical Levels"*, *"Observed Support/Resistance Reference"*).
+   - Removed single-number star ratings ("★ 7.9") and reframed signal scores as multi-factor quantitative data indices (*"Signal: 8.4 / 10 • Factor Model Alignment"*).
+   - Replaced prescriptive portfolio health commands (*"NEEDS REBALANCING"*, *"Optimizer Actions"*) with educational risk dispersion metrics (*"Risk Dispersion Score: 53.2 • Moderate Concentration"*, *"Factor Insights & Risk Alerts"*).
+   - Embedded persistent compliance disclaimers across all application headers, modals, and screen footers: *"For educational, market research, and informational purposes only. Not investment, tax, or financial advice. No personalized recommendations provided."*
+
+2. **14-Factor Technical & Market Indicator Hub (`TechnicalIndicatorHubModal`):**
+   - Streamlined the Stock Detail panel top-section to prominently display ticker symbol, company name, sector, price & percentage change, and technical signal score.
+   - Introduced an openable interactive modal hub containing 14 organized quantitative market data categories:
+     1. Moving Averages Alignment (SMA 20/50/200, EMA 9/21, Golden/Death Cross status)
+     2. Momentum Oscillators (14D RSI with overbought/oversold state, MACD line/signal/histogram, Stochastic %K/%D)
+     3. Reference Levels (Observed Support/Resistance bands)
+     4. Volume & Liquidity Profile (Daily Volume, 20D Relative Volume, Volume Profile status)
+     5. Implied Volatility & Regime (IV Current, IV Rank %, IV Percentile %, Regime classification)
+     6. Average True Range (14D ATR dollar value and ATR % of price)
+     7. Options Greeks Sensitivity (Delta, Gamma, Theta, Vega educational reference characteristics)
+     8. Options Flow & Open Interest (Put/Call Ratio, PCR skew status, call/put heavy strike concentrations)
+     9. 52-Week Range Extremes (52W High/Low with percentage distances)
+     10. 6-Month / 26-Week Range Extremes (6M High/Low)
+     11. Beta & Benchmark Correlation (Beta coefficient vs SPY, S&P 500 correlation, Sector correlation)
+     12. Sector Relative Strength (Primary sector, relative strength vs SPY)
+     13. Earnings Consensus Band (Wall Street consensus range, reporting status)
+     14. Sourced Catalysts & News Feed (Headlines, publication timestamps, source links, realized 30-day volatility)
+
+3. **Backend Schema & Technical Calculator Extensions:**
+   - Extended `technicals.py` to calculate moving averages (20, 50, 200 SMA, 9, 21 EMA), 52-week extremes, 6-month (126-bar) extremes, MACD, Bollinger Bands, ATR, Stochastic, and Beta locally from price candle bars.
+   - Extended `StockDetailSchema` and frontend `StockDetail` with `sma_200`, `high_52w`, `low_52w`, `high_6m`, `low_6m`, and `technicalIndicators: TechnicalIndicatorDataSchema`.
+
+4. **Screener Universe Tabs Realignment:**
+   - Removed the previous two standalone tabs (*"Top 20 Trending"* and *"Long-Term Accumulation"*).
+   - Standardized on exactly two universe navigation tabs: **All Universe** and **⚡ Earnings Today**.
 
 ### High-Level System Architecture
 

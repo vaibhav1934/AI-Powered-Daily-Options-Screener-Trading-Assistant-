@@ -379,6 +379,24 @@ class NewsItemSchema(BaseModel):
     summary: Optional[str] = None
 
 
+class TechnicalIndicatorDataSchema(BaseModel):
+    support_resistance: Optional[dict[str, Any]] = None
+    moving_averages: Optional[dict[str, Any]] = None
+    momentum_oscillators: Optional[dict[str, Any]] = None
+    volume_metrics: Optional[dict[str, Any]] = None
+    implied_volatility: Optional[dict[str, Any]] = None
+    options_greeks: Optional[dict[str, Any]] = None
+    options_open_interest: Optional[dict[str, Any]] = None
+    atr_volatility: Optional[dict[str, Any]] = None
+    high_low_52w: Optional[dict[str, Any]] = None
+    high_low_6m: Optional[dict[str, Any]] = None
+    beta_correlation: Optional[dict[str, Any]] = None
+    earnings_consensus: Optional[dict[str, Any]] = None
+    historical_seasonality: Optional[dict[str, Any]] = None
+    sector_relative_strength: Optional[dict[str, Any]] = None
+    news_catalysts: Optional[list[dict[str, Any]]] = None
+
+
 class StockDetailSchema(BaseModel):
     id: Optional[int] = None
     symbol: str
@@ -391,6 +409,12 @@ class StockDetailSchema(BaseModel):
     volume: Optional[str] = None
     hardFlags: list[str]
     levels: SupportResistanceLevels
+    sma_200: Optional[float] = None
+    high_52w: Optional[float] = None
+    low_52w: Optional[float] = None
+    high_6m: Optional[float] = None
+    low_6m: Optional[float] = None
+    technicalIndicators: Optional[TechnicalIndicatorDataSchema] = None
     layerScores: list[LayerScoreItem]
     reasons: list[ReasonItem] = []
     news: list[NewsItemSchema] = []

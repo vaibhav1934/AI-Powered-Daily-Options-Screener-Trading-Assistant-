@@ -66,6 +66,108 @@ export interface StockSynthesis {
   newsSummary: string | null;
 }
 
+export interface TechnicalIndicatorData {
+  support_resistance?: {
+    support?: number;
+    resistance?: number;
+    level_type?: string;
+  };
+  moving_averages?: {
+    sma_20?: number | null;
+    sma_50?: number | null;
+    sma_200?: number | null;
+    ema_9?: number | null;
+    ema_21?: number | null;
+    golden_cross?: boolean;
+    death_cross?: boolean;
+    trend_alignment?: string;
+  };
+  momentum_oscillators?: {
+    rsi?: number | null;
+    rsi_state?: string;
+    macd?: {
+      macd_line?: number | null;
+      signal_line?: number | null;
+      histogram?: number | null;
+      trend?: string;
+    } | null;
+    bollinger?: {
+      upper?: number | null;
+      middle?: number | null;
+      lower?: number | null;
+      bandwidth?: number | null;
+    } | null;
+    stochastic?: {
+      k?: number | null;
+      d?: number | null;
+    } | null;
+  };
+  volume_metrics?: {
+    volume?: string;
+    avg_volume_20d?: string | number | null;
+    relative_volume?: number | null;
+    volume_profile_state?: string;
+  };
+  implied_volatility?: {
+    iv_current?: number | null;
+    iv_rank?: number | null;
+    iv_percentile?: number | null;
+    regime?: string;
+  };
+  options_greeks?: {
+    delta?: number | null;
+    gamma?: number | null;
+    theta?: number | null;
+    vega?: number | null;
+    description?: string;
+  };
+  options_open_interest?: {
+    put_call_ratio?: number | null;
+    pcr_state?: string;
+    total_call_oi?: number | null;
+    total_put_oi?: number | null;
+  };
+  atr_volatility?: {
+    atr_14?: number | null;
+    atr_pct?: number | null;
+  } | null;
+  high_low_52w?: {
+    high_52w?: number | null;
+    low_52w?: number | null;
+    dist_from_high_pct?: number | null;
+    dist_from_low_pct?: number | null;
+  };
+  high_low_6m?: {
+    high_6m?: number | null;
+    low_6m?: number | null;
+    period?: string;
+  };
+  beta_correlation?: {
+    beta?: number | null;
+    sector_correlation?: number | null;
+    sp500_correlation?: number | null;
+  };
+  earnings_consensus?: {
+    consensus_eps_range?: string;
+    status?: string;
+  };
+  historical_seasonality?: {
+    hist_vol_30d?: number | null;
+    seasonality_stats?: string;
+  };
+  sector_relative_strength?: {
+    sector?: string;
+    rank?: string;
+    relative_strength?: string;
+  };
+  news_catalysts?: Array<{
+    headline: string;
+    source: string;
+    publishedAt: string;
+    url: string;
+  }>;
+}
+
 export interface StockDetail {
   id?: number;
   symbol: string;
@@ -78,6 +180,12 @@ export interface StockDetail {
   volume?: string;
   hardFlags: string[];
   levels: SupportResistanceLevels;
+  sma_200?: number | null;
+  high_52w?: number | null;
+  low_52w?: number | null;
+  high_6m?: number | null;
+  low_6m?: number | null;
+  technicalIndicators?: TechnicalIndicatorData;
   layerScores: LayerScoreItem[];
   reasons: ReasonItem[];
   news: NewsItem[];
@@ -261,4 +369,4 @@ export interface PositionListResponse {
   results: PositionItem[];
 }
 
-export type ViewMode = "TACTICAL_30D" | "LONG_TERM" | "ALL_STOCKS";
+export type ViewMode = "ALL_STOCKS" | "EARNINGS_TODAY" | "TACTICAL_30D" | "LONG_TERM";
