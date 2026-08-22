@@ -16,9 +16,12 @@ import {
   TrendingUp,
   Compass,
   ShieldAlert,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { uploadOptionsChainScreenshot } from "@/lib/api";
 import { TechnicalIndicatorHubModal } from "./TechnicalIndicatorHubModal";
+import { NewsSwipeDigest } from "../news/NewsSwipeDigest";
 
 const reasonColor: Record<string, string> = { bull: "#188038", bear: "#c5221f", neutral: "#5f6368" };
 
@@ -64,6 +67,7 @@ export function DetailPanel({
   const [paperMessage, setPaperMessage] = useState<string | null>(null);
   const [paperError, setPaperError] = useState<string | null>(null);
   const [showHubModal, setShowHubModal] = useState(false);
+  const [newsViewMode, setNewsViewMode] = useState<"cards" | "list">("cards");
 
   useEffect(() => {
     if (detail) {
@@ -521,9 +525,52 @@ export function DetailPanel({
       )}
 
       {/* Sourced News Feed */}
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", margin: "14px 0 8px", display: "flex", alignItems: "center", gap: 6 }}>
-        <Newspaper size={13} /> Sourced News & Catalysts
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#202124", margin: "16px 0 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Newspaper size={13} color="#1a73e8" /> <span>Sourced News & Catalysts</span>
+        </div>
+        <div style={{ display: "flex", gap: 2, background: "#f1f3f4", padding: 2, borderRadius: 6 }}>
+          <button
+            onClick={() => setNewsViewMode("cards")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "3px 8px",
+              borderRadius: 4,
+              border: "none",
+              background: newsViewMode === "cards" ? "#fff" : "transparent",
+              color: newsViewMode === "cards" ? "#1a73e8" : "#5f6368",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: newsViewMode === "cards" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+            }}
+          >
+            <LayoutGrid size={11} /> Swipe Digest
+          </button>
+          <button
+            onClick={() => setNewsViewMode("list")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "3px 8px",
+              borderRadius: 4,
+              border: "none",
+              background: newsViewMode === "list" ? "#fff" : "transparent",
+              color: newsViewMode === "list" ? "#1a73e8" : "#5f6368",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: newsViewMode === "list" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+            }}
+          >
+            <List size={11} /> List
+          </button>
+        </div>
       </div>
+
       {loadingSynthesis ? (
         <div style={{ padding: "12px 12px", backgroundColor: "#f8fafd", border: "1px solid #e8f0fe", borderRadius: 8, marginBottom: 12, display: "flex", gap: 8, alignItems: "center", color: "#1a73e8", fontSize: 12 }}>
           <Loader2 size={15} className="animate-spin" /> Synthesizing market catalysts...
@@ -550,7 +597,15 @@ export function DetailPanel({
           </div>
         </div>
       ) : null}
-      {detail.news && detail.news.length > 0 ? (
+
+      {newsViewMode === "cards" ? (
+        <NewsSwipeDigest
+          symbol={detail.symbol}
+          companyName={detail.name}
+          news={detail.news || []}
+          pctChange={detail.pct}
+        />
+      ) : detail.news && detail.news.length > 0 ? (
         detail.news.map((n, i) => {
           const title = n.headline;
           const source = n.source || "News";

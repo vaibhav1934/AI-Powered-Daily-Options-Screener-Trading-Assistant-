@@ -121,6 +121,11 @@ To target and maintain full compliance with the **Investment Advisers Act Publis
    - Removed the previous two standalone tabs (*"Top 20 Trending"* and *"Long-Term Accumulation"*).
    - Standardized on exactly two universe navigation tabs: **All Universe** and **⚡ Earnings Today**.
 
+5. **Swipeable Market Catalyst Digest (`NewsSwipeDigest`):**
+   - Introduced a vertical swipeable news digest component inspired by leading institutional and modern consumer market apps (e.g., Bloomberg, Inshorts, Robinhood).
+   - Touch gesture support (swipe up/down), desktop drag & arrow-key navigation (`↑`/`↓`), progress track indicators, sentiment tone badges (`Positive Catalyst` / `Negative Tone` / `Market Commentary`), concise synthesized $\le 60$-word summaries, and live source attribution with direct outbound links.
+   - Dual-mode view integration across both the right-hand Stock Detail Panel and the 14-Factor Indicator Hub (Factor 14: Sourced Catalysts).
+
 ### High-Level System Architecture
 
 ```mermaid

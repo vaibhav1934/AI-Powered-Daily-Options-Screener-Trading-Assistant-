@@ -58,6 +58,7 @@ export interface NewsItem {
   source: string;
   url: string;
   publishedAt: string;
+  summary?: string;
 }
 
 export interface StockSynthesis {

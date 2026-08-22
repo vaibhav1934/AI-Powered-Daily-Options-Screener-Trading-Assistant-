@@ -16,8 +16,11 @@ import {
   X,
   ExternalLink,
   ChevronRight,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { StockDetail, TechnicalIndicatorData } from "@/types/stockglass";
+import { NewsSwipeDigest } from "../news/NewsSwipeDigest";
 
 interface TechnicalIndicatorHubModalProps {
   stock: StockDetail;
@@ -33,6 +36,7 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<TabKey>("technicals");
+  const [newsMode, setNewsMode] = useState<"cards" | "list">("cards");
 
   if (!isOpen) return null;
 
@@ -520,12 +524,43 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
 
               {/* Sourced News Feed */}
               <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-3">
-                  <Newspaper className="w-4 h-4 text-sky-400" />
-                  <span>Sourced Market Catalysts & News Headlines</span>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
+                    <Newspaper className="w-4 h-4 text-sky-400" />
+                    <span>Sourced Market Catalysts & News Headlines</span>
+                  </div>
+                  <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                    <button
+                      onClick={() => setNewsMode("cards")}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                        newsMode === "cards" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <LayoutGrid className="w-3 h-3" />
+                      <span>Swipe Cards</span>
+                    </button>
+                    <button
+                      onClick={() => setNewsMode("list")}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                        newsMode === "list" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      <List className="w-3 h-3" />
+                      <span>List</span>
+                    </button>
+                  </div>
                 </div>
 
-                {stock.news && stock.news.length > 0 ? (
+                {newsMode === "cards" ? (
+                  <div className="max-w-md mx-auto">
+                    <NewsSwipeDigest
+                      symbol={stock.symbol}
+                      companyName={stock.name}
+                      news={stock.news || []}
+                      pctChange={stock.pct}
+                    />
+                  </div>
+                ) : stock.news && stock.news.length > 0 ? (
                   <div className="space-y-2.5">
                     {stock.news.map((item, idx) => (
                       <a
