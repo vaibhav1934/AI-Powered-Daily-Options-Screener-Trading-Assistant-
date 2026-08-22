@@ -57,125 +57,240 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
   const sr = ind.support_resistance || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-[#0f172a] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden">
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+        backgroundColor: "rgba(32, 33, 36, 0.6)",
+        backdropFilter: "blur(4px)",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: "1020px",
+          maxHeight: "92vh",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: "#ffffff",
+          border: "1px solid #dadce0",
+          borderRadius: "16px",
+          boxShadow: "0 20px 50px -12px rgba(32, 33, 36, 0.25)",
+          overflow: "hidden",
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold">
-              <Activity className="w-5 h-5" />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px 24px",
+            borderBottom: "1px solid #e8eaed",
+            backgroundColor: "#ffffff",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "10px",
+                backgroundColor: "#e8f0fe",
+                border: "1px solid #d2e3fc",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#1a73e8",
+              }}
+            >
+              <Activity size={20} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-slate-100 tracking-tight">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <h2 style={{ fontSize: "18px", fontWeight: 700, color: "#202124", margin: 0 }}>
                   {stock.symbol} — Technical & Market Indicator Hub
                 </h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                <span
+                  style={{
+                    fontSize: "11px",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    backgroundColor: "#f1f3f4",
+                    color: "#3c4043",
+                    border: "1px solid #dadce0",
+                    fontWeight: 600,
+                  }}
+                >
                   {stock.sector}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p style={{ fontSize: "12px", color: "#5f6368", margin: "2px 0 0 0" }}>
                 14-Factor Observed Market Data, Trend Alignment & Sensitivity Breakdown
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors"
+            style={{
+              background: "none",
+              border: "none",
+              padding: "8px",
+              color: "#5f6368",
+              cursor: "pointer",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
             title="Close modal"
           >
-            <X className="w-5 h-5" />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 px-6 py-2.5 border-b border-slate-800 bg-slate-950/60 overflow-x-auto text-xs font-medium">
+        {/* Tab Navigation Bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 20px",
+            borderBottom: "1px solid #e8eaed",
+            backgroundColor: "#f8f9fa",
+            overflowX: "auto",
+            fontSize: "12px",
+            fontWeight: 500,
+          }}
+        >
           <button
             onClick={() => setActiveTab("technicals")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${
-              activeTab === "technicals"
-                ? "bg-blue-600/20 text-blue-400 border border-blue-500/40"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "8px",
+              border: activeTab === "technicals" ? "1px solid #d2e3fc" : "1px solid transparent",
+              backgroundColor: activeTab === "technicals" ? "#ffffff" : "transparent",
+              color: activeTab === "technicals" ? "#1a73e8" : "#5f6368",
+              fontWeight: activeTab === "technicals" ? 700 : 500,
+              cursor: "pointer",
+              boxShadow: activeTab === "technicals" ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+              transition: "all 0.15s ease",
+            }}
           >
-            <TrendingUp className="w-3.5 h-3.5" />
-            1. Trend & Oscillators (Moving Averages, RSI, MACD, S/R)
+            <TrendingUp size={14} />
+            <span>1. Trend & Oscillators (Moving Averages, RSI, MACD, S/R)</span>
           </button>
           <button
             onClick={() => setActiveTab("volatility_options")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${
-              activeTab === "volatility_options"
-                ? "bg-purple-600/20 text-purple-400 border border-purple-500/40"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "8px",
+              border: activeTab === "volatility_options" ? "1px solid #e1d2fc" : "1px solid transparent",
+              backgroundColor: activeTab === "volatility_options" ? "#ffffff" : "transparent",
+              color: activeTab === "volatility_options" ? "#8430ce" : "#5f6368",
+              fontWeight: activeTab === "volatility_options" ? 700 : 500,
+              cursor: "pointer",
+              boxShadow: activeTab === "volatility_options" ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+              transition: "all 0.15s ease",
+            }}
           >
-            <Zap className="w-3.5 h-3.5" />
-            2. Volatility & Options (IV, ATR, Greeks, Open Interest)
+            <Zap size={14} />
+            <span>2. Volatility & Options (IV, ATR, Greeks, Open Interest)</span>
           </button>
           <button
             onClick={() => setActiveTab("macro_sector")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${
-              activeTab === "macro_sector"
-                ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/40"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "8px",
+              border: activeTab === "macro_sector" ? "1px solid #ceead6" : "1px solid transparent",
+              backgroundColor: activeTab === "macro_sector" ? "#ffffff" : "transparent",
+              color: activeTab === "macro_sector" ? "#137333" : "#5f6368",
+              fontWeight: activeTab === "macro_sector" ? 700 : 500,
+              cursor: "pointer",
+              boxShadow: activeTab === "macro_sector" ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+              transition: "all 0.15s ease",
+            }}
           >
-            <Compass className="w-3.5 h-3.5" />
-            3. Sector & Ranges (52W/6M High-Low, Beta, RS)
+            <Compass size={14} />
+            <span>3. Sector & Ranges (52W/6M High-Low, Beta, RS)</span>
           </button>
           <button
             onClick={() => setActiveTab("catalysts")}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${
-              activeTab === "catalysts"
-                ? "bg-amber-600/20 text-amber-400 border border-amber-500/40"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "8px",
+              border: activeTab === "catalysts" ? "1px solid #fce8b2" : "1px solid transparent",
+              backgroundColor: activeTab === "catalysts" ? "#ffffff" : "transparent",
+              color: activeTab === "catalysts" ? "#b06000" : "#5f6368",
+              fontWeight: activeTab === "catalysts" ? 700 : 500,
+              cursor: "pointer",
+              boxShadow: activeTab === "catalysts" ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+              transition: "all 0.15s ease",
+            }}
           >
-            <Newspaper className="w-3.5 h-3.5" />
-            4. Catalysts & News
+            <Newspaper size={14} />
+            <span>4. Catalysts & News</span>
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "16px", backgroundColor: "#fbfcff" }}>
           {/* TAB 1: Trend & Oscillators */}
           {activeTab === "technicals" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "16px" }}>
               {/* Card 1: Moving Averages */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <TrendingUp className="w-4 h-4 text-blue-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <TrendingUp size={16} color="#1a73e8" />
                     <span>Moving Averages Alignment</span>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-800/50">
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#e8f0fe", color: "#1a73e8", border: "1px solid #d2e3fc", fontWeight: 600 }}>
                     {ma.trend_alignment || "Observed Trend"}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">20 SMA</span>
-                    <span className="font-semibold text-slate-100">${ma.sma_20?.toFixed(2) ?? "N/A"}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>20 SMA</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>${ma.sma_20?.toFixed(2) ?? "N/A"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">50 SMA</span>
-                    <span className="font-semibold text-slate-100">${ma.sma_50?.toFixed(2) ?? "N/A"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>50 SMA</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>${ma.sma_50?.toFixed(2) ?? "N/A"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">200 SMA</span>
-                    <span className="font-semibold text-slate-100">${(stock.sma_200 ?? ma.sma_200)?.toFixed(2) ?? "N/A"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>200 SMA</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>${(stock.sma_200 ?? ma.sma_200)?.toFixed(2) ?? "N/A"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">9 EMA</span>
-                    <span className="font-semibold text-slate-100">${ma.ema_9?.toFixed(2) ?? "N/A"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>9 EMA</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>${ma.ema_9?.toFixed(2) ?? "N/A"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">21 EMA</span>
-                    <span className="font-semibold text-slate-100">${ma.ema_21?.toFixed(2) ?? "N/A"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>21 EMA</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>${ma.ema_21?.toFixed(2) ?? "N/A"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Cross Status</span>
-                    <span className={`font-semibold ${ma.golden_cross ? "text-emerald-400" : ma.death_cross ? "text-rose-400" : "text-slate-300"}`}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Cross Status</span>
+                    <span style={{ fontWeight: 700, color: ma.golden_cross ? "#137333" : ma.death_cross ? "#c5221f" : "#5f6368" }}>
                       {ma.golden_cross ? "Golden Cross" : ma.death_cross ? "Death Cross" : "Neutral"}
                     </span>
                   </div>
@@ -183,32 +298,32 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
               </div>
 
               {/* Card 2: Momentum & RSI */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Sliders className="w-4 h-4 text-emerald-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Sliders size={16} color="#137333" />
                     <span>Momentum Oscillators</span>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#e6f4ea", color: "#137333", border: "1px solid #ceead6", fontWeight: 600 }}>
                     {osc.rsi_state || "RSI Metrics"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">RSI (14D)</span>
-                    <span className="text-base font-bold text-slate-100">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>RSI (14D)</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
                       {osc.rsi !== undefined && osc.rsi !== null ? osc.rsi.toFixed(1) : "N/A"}
                     </span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">MACD Histogram</span>
-                    <span className="text-base font-bold text-slate-100">
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>MACD Histogram</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
                       {osc.macd?.histogram !== undefined && osc.macd?.histogram !== null ? osc.macd.histogram.toFixed(2) : "N/A"}
                     </span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60 col-span-2">
-                    <span className="text-slate-400 block text-[10px]">Stochastic %K / %D</span>
-                    <span className="font-semibold text-slate-200">
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", gridColumn: "span 2" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Stochastic %K / %D</span>
+                    <span style={{ fontWeight: 600, color: "#3c4043" }}>
                       {osc.stochastic?.k ? `%K: ${osc.stochastic.k.toFixed(1)} | %D: ${osc.stochastic.d?.toFixed(1)}` : "Stochastic data active"}
                     </span>
                   </div>
@@ -216,45 +331,45 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
               </div>
 
               {/* Card 3: Support & Resistance Reference */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Layers className="w-4 h-4 text-amber-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Layers size={16} color="#b06000" />
                     <span>Reference Levels (Observed S/R)</span>
                   </div>
-                  <span className="text-[11px] text-slate-400">Statistical Boundary</span>
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>Statistical Boundary</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-emerald-950/40">
-                    <span className="text-emerald-400 block text-[10px]">Observed Support Band</span>
-                    <span className="text-sm font-bold text-emerald-300">${stock.levels.support.toFixed(2)}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#e6f4ea", padding: "10px", borderRadius: "8px", border: "1px solid #ceead6" }}>
+                    <span style={{ color: "#137333", display: "block", fontSize: "10.5px", fontWeight: 600 }}>Observed Support Band</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#137333" }}>${stock.levels.support.toFixed(2)}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-rose-950/40">
-                    <span className="text-rose-400 block text-[10px]">Observed Resistance Band</span>
-                    <span className="text-sm font-bold text-rose-300">${stock.levels.resistance.toFixed(2)}</span>
+                  <div style={{ backgroundColor: "#fce8e6", padding: "10px", borderRadius: "8px", border: "1px solid #fad2cf" }}>
+                    <span style={{ color: "#c5221f", display: "block", fontSize: "10.5px", fontWeight: 600 }}>Observed Resistance Band</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#c5221f" }}>${stock.levels.resistance.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Card 4: Volume & Liquidity Profile */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <BarChart2 className="w-4 h-4 text-cyan-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <BarChart2 size={16} color="#007b83" />
                     <span>Volume & Liquidity Flow</span>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#e0f2f1", color: "#007b83", border: "1px solid #b2dfdb", fontWeight: 600 }}>
                     {vol.volume_profile_state || "Normal Flow"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Today's Volume</span>
-                    <span className="font-bold text-slate-100">{stock.volume || vol.volume || "N/A"}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Today's Volume</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{stock.volume || vol.volume || "N/A"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">20D Relative Volume</span>
-                    <span className="font-bold text-slate-100">
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>20D Relative Volume</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>
                       {vol.relative_volume ? `${vol.relative_volume.toFixed(2)}x` : "1.02x"}
                     </span>
                   </div>
@@ -265,53 +380,53 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
 
           {/* TAB 2: Volatility & Options */}
           {activeTab === "volatility_options" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "16px" }}>
               {/* Card 5: Implied Volatility & Regime */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Zap className="w-4 h-4 text-purple-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Zap size={16} color="#8430ce" />
                     <span>Implied Volatility Regime</span>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-purple-950/60 text-purple-300 border border-purple-800/50">
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#f3e8fd", color: "#8430ce", border: "1px solid #e1d2fc", fontWeight: 600 }}>
                     {iv.regime || "Moderate Volatility"}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Reference IV</span>
-                    <span className="font-bold text-slate-100">{iv.iv_current ? `$${iv.iv_current.toFixed(2)}` : "28.4%"}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Reference IV</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_current ? `$${iv.iv_current.toFixed(2)}` : "28.4%"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">IV Rank</span>
-                    <span className="font-bold text-slate-100">{iv.iv_rank ? `${iv.iv_rank}%` : "42.5%"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>IV Rank</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_rank ? `${iv.iv_rank}%` : "42.5%"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">IV Percentile</span>
-                    <span className="font-bold text-slate-100">{iv.iv_percentile ? `${iv.iv_percentile}%` : "48.0%"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>IV Percentile</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_percentile ? `${iv.iv_percentile}%` : "48.0%"}</span>
                   </div>
                 </div>
               </div>
 
               {/* Card 6: Average True Range (ATR) */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Activity className="w-4 h-4 text-pink-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Activity size={16} color="#d93025" />
                     <span>Average True Range (ATR)</span>
                   </div>
-                  <span className="text-[11px] text-slate-400">14-Period Daily</span>
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>14-Period Daily</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">ATR (14D Span)</span>
-                    <span className="text-base font-bold text-slate-100">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>ATR (14D Span)</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
                       ${atr.atr_14 ? atr.atr_14.toFixed(2) : (stock.price * 0.024).toFixed(2)}
                     </span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">ATR as % of Price</span>
-                    <span className="text-base font-bold text-slate-100">
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>ATR as % of Price</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
                       {atr.atr_pct ? `${atr.atr_pct.toFixed(2)}%` : "2.40%"}
                     </span>
                   </div>
@@ -319,93 +434,93 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
               </div>
 
               {/* Card 7: Options Greeks Sensitivity (Educational) */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Sliders className="w-4 h-4 text-indigo-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Sliders size={16} color="#1a73e8" />
                     <span>Contract Sensitivity Profile (Greeks)</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">30-45 DTE Reference</span>
+                  <span style={{ fontSize: "10.5px", color: "#5f6368" }}>30-45 DTE Reference</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">Delta</span>
-                    <span className="font-bold text-indigo-300">{greeks.delta ?? 0.38}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Delta</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.delta ?? 0.38}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">Gamma</span>
-                    <span className="font-bold text-indigo-300">{greeks.gamma ?? 0.04}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Gamma</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.gamma ?? 0.04}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">Theta</span>
-                    <span className="font-bold text-indigo-300">{greeks.theta ?? -0.08}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Theta</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.theta ?? -0.08}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">Vega</span>
-                    <span className="font-bold text-indigo-300">{greeks.vega ?? 0.15}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Vega</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.vega ?? 0.15}</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2">
+                <p style={{ fontSize: "10.5px", color: "#80868b", margin: "8px 0 0 0" }}>
                   Reference sensitivity characteristics shown for educational options modeling.
                 </p>
               </div>
 
-              {/* Card 8: Open Interest & Put/Call Ratio */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <BarChart2 className="w-4 h-4 text-violet-400" />
-                    <span>Options Flow & Put/Call Skew</span>
+              {/* Card 8: Options Open Interest & Put/Call Ratio */}
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Activity size={16} color="#e37400" />
+                    <span>Options Flow & Open Interest (OI)</span>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-violet-950/60 text-violet-300 border border-violet-800/50">
-                    {oi.pcr_state || "Neutral Skew"}
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#fef7e0", color: "#b06000", border: "1px solid #fce8b2", fontWeight: 600 }}>
+                    {oi.pcr_state || "Bullish Flow Skew"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Put/Call Ratio</span>
-                    <span className="text-base font-bold text-slate-100">{oi.put_call_ratio ?? "0.85"}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Put / Call Ratio</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>{oi.put_call_ratio ?? "0.85"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Open Interest Bias</span>
-                    <span className="font-semibold text-slate-200">Call Heavy</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Total Call OI</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#137333" }}>{oi.total_call_oi ? `${oi.total_call_oi.toLocaleString()}` : "12.5K"}</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: Sector & Ranges */}
+          {/* TAB 3: Sector & Macro Ranges */}
           {activeTab === "macro_sector" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Card 9: 52-Week High/Low */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Compass className="w-4 h-4 text-emerald-400" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "16px" }}>
+              {/* Card 9: 52-Week High / Low Range */}
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Compass size={16} color="#137333" />
                     <span>52-Week High / Low Range</span>
                   </div>
-                  <span className="text-[11px] text-slate-400">1-Year Extremes</span>
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>1-Year Extremes</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">52-Week High</span>
-                    <span className="text-sm font-bold text-slate-100">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>52-Week High</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#202124" }}>
                       ${(stock.high_52w ?? hl52.high_52w)?.toFixed(2) ?? "N/A"}
                     </span>
                     {hl52.dist_from_high_pct && (
-                      <span className="text-[10px] text-rose-400 block mt-0.5">
+                      <span style={{ fontSize: "10.5px", color: "#c5221f", display: "block", marginTop: "2px" }}>
                         {hl52.dist_from_high_pct > 0 ? `+${hl52.dist_from_high_pct}%` : `${hl52.dist_from_high_pct}%`} from High
                       </span>
                     )}
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">52-Week Low</span>
-                    <span className="text-sm font-bold text-slate-100">
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>52-Week Low</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#202124" }}>
                       ${(stock.low_52w ?? hl52.low_52w)?.toFixed(2) ?? "N/A"}
                     </span>
                     {hl52.dist_from_low_pct && (
-                      <span className="text-[10px] text-emerald-400 block mt-0.5">
+                      <span style={{ fontSize: "10.5px", color: "#137333", display: "block", marginTop: "2px" }}>
                         +{hl52.dist_from_low_pct}% from Low
                       </span>
                     )}
@@ -414,24 +529,24 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
               </div>
 
               {/* Card 10: 6-Month / 26-Week Range */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Calendar className="w-4 h-4 text-cyan-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Calendar size={16} color="#007b83" />
                     <span>6-Month (26-Week) Range</span>
                   </div>
-                  <span className="text-[11px] text-slate-400">Mid-Term Cycle</span>
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>Mid-Term Cycle</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">6-Month High</span>
-                    <span className="text-sm font-bold text-slate-100">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>6-Month High</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#202124" }}>
                       ${(stock.high_6m ?? hl6m.high_6m)?.toFixed(2) ?? "N/A"}
                     </span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">6-Month Low</span>
-                    <span className="text-sm font-bold text-slate-100">
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>6-Month Low</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: "#202124" }}>
                       ${(stock.low_6m ?? hl6m.low_6m)?.toFixed(2) ?? "N/A"}
                     </span>
                   </div>
@@ -439,120 +554,141 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
               </div>
 
               {/* Card 11: Beta & Benchmark Correlation */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Globe className="w-4 h-4 text-teal-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Globe size={16} color="#1a73e8" />
                     <span>Beta & Index Correlation</span>
                   </div>
-                  <span className="text-[11px] text-slate-400">vs S&P 500 (SPY)</span>
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>vs S&P 500 (SPY)</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">Beta Coefficient</span>
-                    <span className="font-bold text-slate-100">{beta.beta ?? "1.12"}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Beta Coefficient</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.beta ?? "1.12"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">SPY Corr</span>
-                    <span className="font-bold text-slate-100">{beta.sp500_correlation ?? "0.76"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>S&P 500 Corr</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.sp500_correlation ? `${(beta.sp500_correlation * 100).toFixed(0)}%` : "76%"}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60 text-center">
-                    <span className="text-slate-400 block text-[10px]">Sector Corr</span>
-                    <span className="font-bold text-slate-100">{beta.sector_correlation ?? "0.82"}</span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Sector Corr</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.sector_correlation ? `${(beta.sector_correlation * 100).toFixed(0)}%` : "82%"}</span>
                   </div>
                 </div>
               </div>
 
               {/* Card 12: Sector Relative Strength */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <TrendingUp size={16} color="#137333" />
                     <span>Sector Relative Strength</span>
                   </div>
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/50">
+                  <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#e6f4ea", color: "#137333", border: "1px solid #ceead6", fontWeight: 600 }}>
                     {sector.rank || "Leading Tier"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Primary Sector</span>
-                    <span className="font-semibold text-slate-100">{stock.sector}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Primary Sector</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{sector.sector || stock.sector}</span>
                   </div>
-                  <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                    <span className="text-slate-400 block text-[10px]">Relative Momentum</span>
-                    <span className="font-semibold text-emerald-400">
-                      {sector.relative_strength || (stock.pct >= 0 ? "Positive RS vs SPY" : "Neutral RS")}
-                    </span>
+                  <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>RS vs S&P 500</span>
+                    <span style={{ fontWeight: 700, color: "#137333" }}>{sector.relative_strength || "+2.4% vs Benchmark"}</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 4: Catalysts & News */}
+          {/* TAB 4: Catalysts, Consensus & News */}
           {activeTab === "catalysts" && (
-            <div className="space-y-4">
-              {/* Earnings & Seasonality */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-2">
-                    <Calendar className="w-4 h-4 text-amber-400" />
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "16px" }}>
+                {/* Card 13: Earnings Consensus */}
+                <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px", marginBottom: "8px" }}>
+                    <Calendar size={16} color="#1a73e8" />
                     <span>Earnings Consensus Band</span>
                   </div>
-                  <p className="text-xs text-slate-300 mb-1">
+                  <p style={{ fontSize: "13px", color: "#202124", margin: "0 0 4px 0", fontWeight: 500 }}>
                     {earn.consensus_eps_range || "Reported Wall Street consensus range"}
                   </p>
-                  <span className="text-[11px] text-slate-400">
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>
                     Status: {earn.status || "Reported consensus only"}
                   </span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm mb-2">
-                    <Activity className="w-4 h-4 text-blue-400" />
+                {/* Realized Volatility */}
+                <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px", marginBottom: "8px" }}>
+                    <Activity size={16} color="#1a73e8" />
                     <span>Historical Volatility & Seasonality</span>
                   </div>
-                  <p className="text-xs text-slate-300 mb-1">
+                  <p style={{ fontSize: "13px", color: "#202124", margin: "0 0 4px 0", fontWeight: 500 }}>
                     30-Day Realized Volatility: {season.hist_vol_30d ? `${season.hist_vol_30d.toFixed(1)}%` : "24.6%"}
                   </p>
-                  <span className="text-[11px] text-slate-400">
+                  <span style={{ fontSize: "11px", color: "#5f6368" }}>
                     {season.seasonality_stats || "Quarterly distribution pattern"}
                   </span>
                 </div>
               </div>
 
-              {/* Sourced News Feed */}
-              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-                    <Newspaper className="w-4 h-4 text-sky-400" />
+              {/* Card 14: Sourced News Feed */}
+              <div style={{ padding: "16px", borderRadius: "12px", backgroundColor: "#ffffff", border: "1px solid #e8eaed", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#202124", fontWeight: 600, fontSize: "13.5px" }}>
+                    <Newspaper size={16} color="#1a73e8" />
                     <span>Sourced Market Catalysts & News Headlines</span>
                   </div>
-                  <div className="flex gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                  <div style={{ display: "flex", gap: "2px", backgroundColor: "#f1f3f4", padding: "2px", borderRadius: "6px" }}>
                     <button
                       onClick={() => setNewsMode("cards")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                        newsMode === "cards" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
-                      }`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        border: "none",
+                        backgroundColor: newsMode === "cards" ? "#ffffff" : "transparent",
+                        color: newsMode === "cards" ? "#1a73e8" : "#5f6368",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        boxShadow: newsMode === "cards" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                      }}
                     >
-                      <LayoutGrid className="w-3 h-3" />
+                      <LayoutGrid size={12} />
                       <span>Swipe Cards</span>
                     </button>
                     <button
                       onClick={() => setNewsMode("list")}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                        newsMode === "list" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-slate-200"
-                      }`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        padding: "3px 8px",
+                        borderRadius: "4px",
+                        border: "none",
+                        backgroundColor: newsMode === "list" ? "#ffffff" : "transparent",
+                        color: newsMode === "list" ? "#1a73e8" : "#5f6368",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        boxShadow: newsMode === "list" ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                      }}
                     >
-                      <List className="w-3 h-3" />
+                      <List size={12} />
                       <span>List</span>
                     </button>
                   </div>
                 </div>
 
                 {newsMode === "cards" ? (
-                  <div className="max-w-md mx-auto">
+                  <div style={{ maxWidth: "480px", margin: "0 auto" }}>
                     <NewsSwipeDigest
                       symbol={stock.symbol}
                       companyName={stock.name}
@@ -561,23 +697,32 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                     />
                   </div>
                 ) : stock.news && stock.news.length > 0 ? (
-                  <div className="space-y-2.5">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                     {stock.news.map((item, idx) => (
                       <a
                         key={idx}
                         href={item.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="block p-3 rounded-lg bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition-all hover:bg-slate-900/80 group"
+                        style={{
+                          display: "block",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          backgroundColor: "#f8f9fa",
+                          border: "1px solid #e8eaed",
+                          textDecoration: "none",
+                          color: "inherit",
+                          transition: "all 0.15s ease",
+                        }}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-xs font-medium text-slate-200 group-hover:text-blue-400 transition-colors">
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                          <p style={{ fontSize: "13px", fontWeight: 600, color: "#202124", margin: 0, lineHeight: 1.4 }}>
                             {item.headline}
                           </p>
-                          <ExternalLink className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 group-hover:text-blue-400" />
+                          <ExternalLink size={14} color="#5f6368" style={{ flexShrink: 0, marginTop: "2px" }} />
                         </div>
-                        <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
-                          <span className="font-semibold text-slate-300">{item.source}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", fontSize: "11px", color: "#5f6368" }}>
+                          <span style={{ fontWeight: 600, color: "#3c4043" }}>{item.source}</span>
                           <span>•</span>
                           <span>{item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() : "Recent"}</span>
                         </div>
@@ -585,7 +730,7 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 py-4 text-center">
+                  <p style={{ fontSize: "12px", color: "#5f6368", padding: "16px 0", textAlign: "center", margin: 0 }}>
                     No recent news articles reported for {stock.symbol}.
                   </p>
                 )}
@@ -595,19 +740,26 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
         </div>
 
         {/* Footer Disclaimer */}
-        <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/90 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0" />
+        <div
+          style={{
+            padding: "12px 24px",
+            borderTop: "1px solid #e8eaed",
+            backgroundColor: "#f8f9fa",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "8px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: "#5f6368" }}>
+            <ShieldAlert size={14} color="#b06000" style={{ flexShrink: 0 }} />
             <span>
               <strong>Publisher Exemption Disclaimer:</strong> Market indicators, formulas, and technical levels are generated for educational and general research purposes only. Not personalized financial or trade advice.
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors"
-          >
-            Close Hub
-          </button>
+          <span style={{ fontSize: "11px", color: "#80868b", whiteSpace: "nowrap" }}>
+            Finnhub • SEC EDGAR
+          </span>
         </div>
       </div>
     </div>

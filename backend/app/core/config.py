@@ -184,8 +184,8 @@ class DatabaseConfig(BaseSettings):
 
     @model_validator(mode="after")
     def validate_supabase_pooler_mode(self) -> "DatabaseConfig":
-        url = (self.database_url or "").strip().lower()
-        if url.startswith("sqlite"):
+        url = (self.database_url or "").strip()
+        if url.lower().startswith("sqlite"):
             return self
 
         parsed = urlparse(url)
@@ -193,12 +193,11 @@ class DatabaseConfig(BaseSettings):
         port = parsed.port
 
         # Supabase session mode (5432) often hits EMAXCONNSESSION on API workloads.
-        # Force transaction mode configuration early with a clear actionable message.
+        # Auto-upgrade to transaction pooler port 6543 with sslmode=require.
         if "pooler.supabase.com" in host and port == 5432:
-            raise ValueError(
-                "DATABASE_URL points to Supabase session pooler (port 5432). "
-                "Use transaction pooler port 6543 with sslmode=require to avoid EMAXCONNSESSION."
-            )
+            logger.info("DATABASE_URL points to Supabase pooler port 5432. Auto-routing to transaction pooler port 6543.")
+            netloc = parsed.netloc.replace(":5432", ":6543")
+            self.database_url = parsed._replace(netloc=netloc).geturl()
 
         return self
 
@@ -236,11 +235,6 @@ class AppConfig(BaseSettings):
     # Pre-market scan schedule (CST, 24h)
     scan_schedule_hour: int = Field(default=6)
     scan_schedule_minute: int = Field(default=30)
-    
-    # Continuous Scan schedule (Rate-limit respecting)
-    scan_continuous_enabled: bool = Field(default=True)
-    scan_batch_size: int = Field(default=5)
-    scan_interval_seconds: int = Field(default=30)
 
     # Portfolio maintenance schedule (CST)
     portfolio_scheduler_enabled: bool = Field(default=True)
