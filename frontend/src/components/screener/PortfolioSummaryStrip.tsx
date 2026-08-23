@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Gauge, ShieldAlert } from "lucide-react";
+import { ArrowRight, Gauge, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
 import { PortfolioOptimizationResponse, PortfolioScoreResponse } from "@/types/stockglass";
 
 interface PortfolioSummaryStripProps {
@@ -10,6 +10,7 @@ interface PortfolioSummaryStripProps {
   optimization: PortfolioOptimizationResponse | null;
   loading: boolean;
   error?: string | null;
+  isMobile?: boolean;
 }
 
 const bandColor: Record<string, { bg: string; fg: string; border: string }> = {
@@ -31,7 +32,8 @@ function formatBand(band: string): string {
   return map[band] || band.replace(/_/g, " ");
 }
 
-export function PortfolioSummaryStrip({ score, optimization, loading, error }: PortfolioSummaryStripProps) {
+export function PortfolioSummaryStrip({ score, optimization, loading, error, isMobile }: PortfolioSummaryStripProps) {
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const band = score?.band || "DATA_NOT_AVAILABLE";
   const colors = bandColor[band] || bandColor.DATA_NOT_AVAILABLE;
   const weakest = (score?.components || [])
@@ -39,6 +41,54 @@ export function PortfolioSummaryStrip({ score, optimization, loading, error }: P
     .sort((a, b) => (a.score ?? 999) - (b.score ?? 999))
     .slice(0, 2);
   const actionCount = optimization?.actions?.length || 0;
+
+  if (isMobile) {
+    return (
+      <div style={{ maxWidth: 1400, margin: "6px auto 0", width: "100%", padding: "0 12px", boxSizing: "border-box", flexShrink: 0 }}>
+        <div style={{ border: "1px solid #e8eaed", borderRadius: 12, padding: "8px 12px", background: "linear-gradient(180deg, #ffffff 0%, #fbfcff 100%)", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", overflow: "hidden" }}>
+              <Gauge size={15} color="#1a73e8" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#202124" }}>
+                {score?.compositeScore != null ? score.compositeScore.toFixed(1) : "N/A"}
+              </span>
+              <span style={{ background: colors.bg, color: colors.fg, border: `1px solid ${colors.border}`, borderRadius: 999, padding: "2px 7px", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+                {formatBand(band)}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              <Link
+                href="/portfolio"
+                style={{ padding: "4px 9px", borderRadius: 8, background: "#1a73e8", color: "#fff", fontSize: 11, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                Portfolio <ArrowRight size={11} />
+              </Link>
+              {weakest.length > 0 && (
+                <button
+                  onClick={() => setMobileExpanded((v) => !v)}
+                  style={{ background: "none", border: "none", padding: "4px 2px", cursor: "pointer", color: "#5f6368", display: "flex", alignItems: "center" }}
+                  aria-label="Toggle portfolio details"
+                >
+                  {mobileExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+              )}
+            </div>
+          </div>
+          {mobileExpanded && weakest.length > 0 && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #e8eaed", display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10.5, color: "#5f6368", width: "100%", fontWeight: 600, textTransform: "uppercase" }}>Watch Items:</span>
+              {weakest.map((c) => (
+                <div key={c.name} style={{ background: "#fff", border: "1px solid #e8eaed", borderRadius: 999, padding: "2px 8px", fontSize: 11, color: "#3c4043" }}>
+                  <span>{c.name}: </span>
+                  <span style={{ color: "#c5221f", fontWeight: 700 }}>{c.score != null ? c.score.toFixed(1) : "N/A"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

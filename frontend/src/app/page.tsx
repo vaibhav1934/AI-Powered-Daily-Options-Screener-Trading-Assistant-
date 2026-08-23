@@ -428,9 +428,11 @@ export default function StockGlassProDashboard() {
       style={{
         fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
         background: "#fff",
-        height: "100vh",
-        maxHeight: "100vh",
-        overflow: "hidden",
+        minHeight: "100vh",
+        height: isMobile ? "auto" : "100vh",
+        maxHeight: isMobile ? "none" : "100vh",
+        overflowY: isMobile ? "auto" : "hidden",
+        overflowX: "hidden",
         color: "#202124",
         display: "flex",
         flexDirection: "column",
@@ -453,6 +455,7 @@ export default function StockGlassProDashboard() {
         optimization={portfolioOptimization}
         loading={loadingPortfolio}
         error={portfolioError}
+        isMobile={isMobile}
       />
 
       {/* Quick Filter Bar & Panel */}
@@ -469,6 +472,7 @@ export default function StockGlassProDashboard() {
           sectors={sectors}
           riskBucket={riskBucket}
           onRiskBucketChange={setRiskBucket}
+          isMobile={isMobile}
           onClearAll={() => {
             setActiveSector("");
             setMinScore(0);
@@ -478,13 +482,13 @@ export default function StockGlassProDashboard() {
           }}
         />
       ) : (
-        <div style={{ maxWidth: 1400, margin: "6px auto 0", width: "100%", padding: "0 24px", color: "#5f6368", fontSize: 12 }}>
+        <div style={{ maxWidth: 1400, margin: "6px auto 0", width: "100%", padding: isMobile ? "0 12px" : "0 24px", color: "#5f6368", fontSize: 12 }}>
           Showing horizon-specific candidates from the latest scan snapshot.
         </div>
       )}
 
       {/* Main Split Content Area matching exact prototype layout */}
-      <div style={{ display: "flex", maxWidth: 1400, margin: "0 auto", width: "100%", flex: 1, minHeight: 0, overflow: "hidden" }}>
+      <div style={{ display: "flex", maxWidth: 1400, margin: "0 auto", width: "100%", flex: isMobile ? "1 0 auto" : 1, minHeight: 0, height: isMobile ? "auto" : "100%", overflow: isMobile ? "visible" : "hidden" }}>
         {error ? (
           <div style={{ flex: 1, padding: 40, textAlign: "center", color: "#c5221f" }}>
             <p style={{ fontWeight: 600, fontSize: 16 }}>⚠️ API Connection Issue</p>

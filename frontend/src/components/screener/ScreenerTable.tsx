@@ -149,7 +149,7 @@ export function ScreenerTable({
   }
 
   return (
-    <div style={{ flex: 1, padding: "12px 24px", minWidth: 0, minHeight: 0, height: "100%", background: "#fff", overflowY: "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+    <div style={{ flex: 1, padding: isMobile ? "8px 12px 24px" : "12px 24px", minWidth: 0, minHeight: 0, height: isMobile ? "auto" : "100%", background: "#fff", overflowY: isMobile ? "visible" : "auto", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
       <div>
         <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
           {tabs.map((t) => (

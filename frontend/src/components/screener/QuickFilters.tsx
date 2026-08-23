@@ -16,6 +16,7 @@ interface QuickFiltersProps {
   onClearAll?: () => void;
   riskBucket: string;
   onRiskBucketChange: (bucket: string) => void;
+  isMobile?: boolean;
 }
 
 const QUICK_FILTERS = [
@@ -46,6 +47,7 @@ export function QuickFilters({
   onClearAll,
   riskBucket,
   onRiskBucketChange,
+  isMobile,
 }: QuickFiltersProps) {
   const filterBtnRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -444,13 +446,14 @@ export function QuickFilters({
         style={{
           background: "#fff",
           flexShrink: 0,
-          padding: "6px 24px",
+          padding: isMobile ? "6px 12px" : "6px 24px",
           borderBottom: "1px solid #f1f3f4",
           display: "flex",
           alignItems: "center",
           gap: 8,
           flexWrap: "nowrap",
           overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
           msOverflowStyle: "none",
           scrollbarWidth: "none",
         }}
