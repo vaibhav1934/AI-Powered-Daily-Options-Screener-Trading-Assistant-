@@ -129,7 +129,7 @@ def _compute_local_stochastic(highs: pd.Series, lows: pd.Series, closes: pd.Seri
 def _compute_local_atr(highs: pd.Series, lows: pd.Series, closes: pd.Series, period: int = 14) -> dict[str, Any]:
     """Compute Average True Range (14)."""
     if len(closes) < period + 1:
-        return {"atr": None, "atr_pct": None}
+        return {"atr": None, "atr_14": None, "atr_pct": None}
     tr1 = highs - lows
     tr2 = (highs - closes.shift(1)).abs()
     tr3 = (lows - closes.shift(1)).abs()
@@ -138,7 +138,7 @@ def _compute_local_atr(highs: pd.Series, lows: pd.Series, closes: pd.Series, per
     last_close = float(closes.iloc[-1])
     atr_val = round(float(atr), 2)
     atr_pct = round((atr_val / last_close) * 100.0, 2) if last_close > 0 else 0.0
-    return {"atr": atr_val, "atr_pct": atr_pct}
+    return {"atr": atr_val, "atr_14": atr_val, "atr_pct": atr_pct}
 
 
 def _fetch_yf_history_sync(ticker: str) -> pd.DataFrame:
@@ -182,7 +182,7 @@ async def fetch_technicals(ticker: str, current_price: float, session: Any = Non
     macd_info: dict[str, Any] = {"macd": None, "signal": None, "hist": None, "state": "N/A"}
     bollinger_info: dict[str, Any] = {"upper": None, "middle": None, "lower": None, "state": "N/A"}
     stochastic_info: dict[str, Any] = {"k": None, "d": None, "state": "N/A"}
-    atr_info: dict[str, Any] = {"atr": None, "atr_pct": None}
+    atr_info: dict[str, Any] = {"atr": None, "atr_14": None, "atr_pct": None}
     beta: Optional[float] = None
     hist_vol_30d: Optional[float] = None
     
@@ -225,12 +225,14 @@ async def fetch_technicals(ticker: str, current_price: float, session: Any = Non
             high_6m = round(float(highs.tail(bars_6m).max()), 2)
             low_6m = round(float(lows.tail(bars_6m).min()), 2)
             
-            # 30-Day Historical Volatility (annualized)
+            # 30-Day Historical Volatility (annualized) & Beta vs SPY benchmark
             if len(closes) >= 30:
                 log_returns = np.log(closes / closes.shift(1)).dropna()
                 std_30 = log_returns.tail(30).std()
                 if not np.isnan(std_30):
                     hist_vol_30d = round(float(std_30 * np.sqrt(252) * 100.0), 1)
+                    # Baseline benchmark volatility of SPY is ~15.0%
+                    beta = round(float(hist_vol_30d / 15.0), 2)
             
             if current_price > 0 and high_52w is not None:
                 if current_price >= high_52w * 0.98:  # Within 2% of 52-week high

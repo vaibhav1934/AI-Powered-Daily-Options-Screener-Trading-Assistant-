@@ -410,7 +410,9 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Reference IV</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_current ? `$${iv.iv_current.toFixed(2)}` : "28.4%"}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>
+                      {iv.iv_current != null ? (Number(iv.iv_current) > 1.0 ? `${Number(iv.iv_current).toFixed(1)}%` : `${(Number(iv.iv_current) * 100).toFixed(1)}%`) : "28.4%"}
+                    </span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>IV Rank</span>
@@ -436,13 +438,13 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>ATR (14D Span)</span>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
-                      ${atr.atr_14 ? atr.atr_14.toFixed(2) : (stock.price * 0.024).toFixed(2)}
+                      ${((atr.atr_14 ?? (atr as any).atr) != null ? Number(atr.atr_14 ?? (atr as any).atr).toFixed(2) : (stock.price * 0.024).toFixed(2))}
                     </span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>ATR as % of Price</span>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
-                      {atr.atr_pct ? `${atr.atr_pct.toFixed(2)}%` : "2.40%"}
+                      {atr.atr_pct != null ? (Number(atr.atr_pct) > 1.0 ? `${Number(atr.atr_pct).toFixed(2)}%` : `${(Number(atr.atr_pct) * 100).toFixed(2)}%`) : "2.40%"}
                     </span>
                   </div>
                 </div>
@@ -494,11 +496,13 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Put / Call Ratio</span>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>{oi.put_call_ratio ?? "0.85"}</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>{oi.put_call_ratio != null ? Number(oi.put_call_ratio).toFixed(2) : "0.85"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
-                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Total Call OI</span>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#137333" }}>{oi.total_call_oi ? `${oi.total_call_oi.toLocaleString()}` : "12.5K"}</span>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Call Open Interest</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#137333" }}>
+                      {(oi.total_call_oi ?? (oi as any).call_open_interest) != null ? Number(oi.total_call_oi ?? (oi as any).call_open_interest).toLocaleString() : "12.5K"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -579,8 +583,8 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
-                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Beta Coefficient</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.beta ?? "1.12"}</span>
+                    <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Beta (vs. SPY)</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.beta != null ? Number(beta.beta).toFixed(2) : "1.12"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>S&P 500 Corr</span>

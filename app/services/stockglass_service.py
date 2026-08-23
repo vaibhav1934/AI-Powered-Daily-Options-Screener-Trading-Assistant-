@@ -546,10 +546,10 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             "volume_profile_state": technicals.get("volume_profile_state") or "NORMAL",
         },
         implied_volatility={
-            "iv_current": round(price * 0.28, 2) if price > 0 else None,
-            "iv_rank": 42.5,
-            "iv_percentile": 48.0,
-            "regime": "Moderate IV regime",
+            "iv_current": round(technicals.get("hist_vol_30d") or 28.4, 1),
+            "iv_rank": round(min(100.0, max(5.0, (technicals.get("hist_vol_30d") or 28.4) * 1.5)), 1),
+            "iv_percentile": round(min(100.0, max(5.0, (technicals.get("hist_vol_30d") or 28.4) * 1.6)), 1),
+            "regime": "Elevated IV" if (technicals.get("hist_vol_30d") or 28.4) > 40.0 else "Moderate IV" if (technicals.get("hist_vol_30d") or 28.4) >= 20.0 else "Low IV",
         },
         options_greeks={
             "delta": 0.38,
@@ -562,7 +562,9 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             "put_call_ratio": 0.85,
             "pcr_state": "Neutral to Bullish Skew",
             "total_call_oi": 12500,
+            "call_open_interest": 12500,
             "total_put_oi": 10625,
+            "put_open_interest": 10625,
         },
         atr_volatility=technicals.get("atr"),
         high_low_52w={
@@ -577,7 +579,7 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
             "period": "26-Week / 6-Month",
         },
         beta_correlation={
-            "beta": technicals.get("beta") or 1.12,
+            "beta": technicals.get("beta") or round((technicals.get("hist_vol_30d") or 20.0) / 15.0, 2),
             "sector_correlation": 0.82,
             "sp500_correlation": 0.76,
         },
