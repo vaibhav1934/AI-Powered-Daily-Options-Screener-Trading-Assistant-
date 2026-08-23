@@ -568,9 +568,17 @@ To provide a frictionless user experience for institutional traders and eliminat
 ### 5. Complete AI Context Injection & Automated Options Contract Selection
 To ensure institutional-grade explanations and strict compliance with the Zero-Mock Data policy:
 * **Automated Options Contract Selector (`options_service.py`):** In strict adherence to the prohibition against simulated data, strike prices are never calculated using arbitrary percentage multipliers (e.g., flat 5% OTM heuristics). `options_service.py` integrates with `yfinance` to automatically query real exchange option chains and select institutional Call/Put contracts matching target Delta (~0.30 to 0.45) and expiration windows (30–45 DTE). When a live options chain feed is unavailable, `strike_price` evaluates to `NULL` (`None`) and renders as `"N/A - Requires Live Options Chain Feed"`.
+* **Zero-Assumption Chat Protocol:** If the user asks about an indicator or parameter for a ticker that lacks options chain data or sufficient historical bars, the AI Assistant explicitly replies that live market feeds are missing for that instrument, rather than generating synthetic strike estimates or simulated price targets.
+
+### 6. Strict Calculation Input Validation & Live Benchmark Covariance
+To guarantee mathematical rigor and eliminate calculations on corrupt, empty, or unverified data:
+* **Pre-Calculation Boundary Validation:** All technical indicator routines (`technicals.py`) strictly validate that time series contain sufficient non-NaN observations (e.g., `len(closes) >= period + 1`), finite values, and non-zero denominators before executing mathematical formulas (Wilder's RSI, ATR, MACD, Bollinger Bands, Stochastic).
+* **Live S&P 500 Benchmark Covariance:** Rather than using static placeholders or heuristics, the engine fetches live 6-month daily return histories for `SPY` (cached for 1 hour in memory). It computes the exact sample covariance $\text{Cov}(R_{\text{ticker}}, R_{\text{SPY}})$ and variance $\text{Var}(R_{\text{SPY}})$ to derive dynamic Beta:
+  $$\beta = \frac{\text{Cov}(R_{\text{ticker}}, R_{\text{SPY}})}{\text{Var}(R_{\text{SPY}})}$$
+  and Pearson correlation coefficients $\rho_{\text{SPY}}$ and $\rho_{\text{sector}}$. If historical bars are insufficient or variance is zero, fields strictly evaluate to `None` (`null` in JSON) and the UI renders `"N/A"`.
 * **Local Vectorized Technical Indicator Engine (`technicals.py`):** Technical indicators (RSI, SMA 50/200) are computed locally using vectorized `pandas`/`numpy` math on daily OHLCV bars fetched via `yfinance` and Finnhub, eliminating external indicator rate limits while ensuring precision and reproducibility.
 
-### 6. AI News Catalyst Synthesis & Zero-Mock News Policy
+### 7. AI News Catalyst Synthesis & Zero-Mock News Policy
 To provide traders with institutional clarity on market narratives without risking simulated or advisory content:
 * **Concurrent Catalyst Synthesis:** When a user opens the Stock Detail view (`GET /v1/stocks/{symbol}`), the backend concurrently executes `synthesize_reasons` (for score bullets) and `synthesize_news_summary` (for full narrative summary) via `asyncio.gather`.
 * **Institutional Catalyst Summary:** `synthesize_news_summary` feeds up to 5 recent news articles (headlines, summaries, sources) from Finnhub directly to the LLM to generate an objective, 2-sentence institutional summary of the market narrative, fundamental catalyst, or macroeconomic impact. `NewsItemSchema` explicitly includes `summary: Optional[str]` to guarantee end-to-end data integrity.
