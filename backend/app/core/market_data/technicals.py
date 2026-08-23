@@ -52,7 +52,12 @@ def _compute_local_ema(closes: pd.Series, period: int) -> Optional[float]:
 def _compute_local_macd(closes: pd.Series) -> dict[str, Any]:
     """Compute MACD (12, 26, 9)."""
     if len(closes) < 26:
-        return {"macd": None, "signal": None, "hist": None, "state": "Insufficient data"}
+        return {
+            "macd": None, "macd_line": None,
+            "signal": None, "signal_line": None,
+            "hist": None, "histogram": None,
+            "state": "Insufficient data", "trend": "Insufficient data"
+        }
     ema_12 = closes.ewm(span=12, adjust=False).mean()
     ema_26 = closes.ewm(span=26, adjust=False).mean()
     macd_line = ema_12 - ema_26
@@ -70,7 +75,16 @@ def _compute_local_macd(closes: pd.Series) -> dict[str, Any]:
         elif hist.iloc[-2] >= 0 and hist.iloc[-1] < 0:
             state = "Bearish crossover"
             
-    return {"macd": last_macd, "signal": last_sig, "hist": last_hist, "state": state}
+    return {
+        "macd": last_macd,
+        "macd_line": last_macd,
+        "signal": last_sig,
+        "signal_line": last_sig,
+        "hist": last_hist,
+        "histogram": last_hist,
+        "state": state,
+        "trend": state,
+    }
 
 
 def _compute_local_bollinger(closes: pd.Series, period: int = 20, num_std: float = 2.0) -> dict[str, Any]:

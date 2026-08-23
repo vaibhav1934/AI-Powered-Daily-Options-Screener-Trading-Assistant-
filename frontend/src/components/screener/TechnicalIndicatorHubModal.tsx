@@ -317,9 +317,24 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>MACD Histogram</span>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
-                      {osc.macd?.histogram !== undefined && osc.macd?.histogram !== null ? osc.macd.histogram.toFixed(2) : "N/A"}
-                    </span>
+                    {(() => {
+                      const macdObj = osc.macd as any;
+                      const macdHist = macdObj?.histogram ?? macdObj?.hist;
+                      const macdLine = macdObj?.macd_line ?? macdObj?.macd;
+                      const macdSig = macdObj?.signal_line ?? macdObj?.signal;
+                      return (
+                        <>
+                          <span style={{ fontSize: "16px", fontWeight: 700, color: macdHist && macdHist > 0 ? "#137333" : macdHist && macdHist < 0 ? "#c5221f" : "#202124" }}>
+                            {macdHist !== undefined && macdHist !== null ? `${Number(macdHist) > 0 ? "+" : ""}${Number(macdHist).toFixed(2)}` : "N/A"}
+                          </span>
+                          {macdLine !== undefined && macdLine !== null && macdSig !== undefined && macdSig !== null && (
+                            <span style={{ fontSize: "10px", color: "#5f6368", display: "block", marginTop: "2px" }}>
+                              Line: {Number(macdLine).toFixed(2)} | Sig: {Number(macdSig).toFixed(2)}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", gridColumn: "span 2" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Stochastic %K / %D</span>
