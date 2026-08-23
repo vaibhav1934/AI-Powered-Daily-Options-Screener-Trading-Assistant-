@@ -183,14 +183,13 @@ async def get_stock_list(
     Get screener table stock list matching API Contract v1 with pagination.
     Enforces FR-7 by ensuring execution details are excluded while screening market data is shown.
     """
-    target_date = await _get_latest_scan_date(session) or date.today()
-    start_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
-    logger.info("[FLOW: Service Layer] ──> get_stock_list: Querying DB DailyScan for date >= %s (filters: list=%s, sector=%s, minScore=%s)", target_date, list_param, sector, min_score)
+    rolling_7d_dt = datetime.now(timezone.utc) - timedelta(days=7)
+    logger.info("[FLOW: Service Layer] ──> get_stock_list: Querying DB DailyScan for 7-day rolling window >= %s (filters: list=%s, sector=%s, minScore=%s)", rolling_7d_dt, list_param, sector, min_score)
     
     stmt = (
         select(DailyScan)
-        .where(DailyScan.scan_date >= start_dt)
-        .order_by(DailyScan.score.desc())
+        .where(DailyScan.scan_date >= rolling_7d_dt)
+        .order_by(DailyScan.scan_date.desc(), DailyScan.score.desc())
     )
     
     if list_param and list_param.lower() in ("list1", "list_1"):
@@ -208,7 +207,17 @@ async def get_stock_list(
         stmt = stmt.where(DailyScan.risk_bucket == RiskBucket(risk_bucket.upper()))
         
     result = await session.execute(stmt)
-    scans = list(result.scalars().all())
+    raw_scans = list(result.scalars().all())
+    
+    # Deduplicate by ticker, keeping the single freshest scan per ticker
+    scans_by_ticker: dict[str, DailyScan] = {}
+    for s in raw_scans:
+        ticker_up = s.ticker.upper()
+        if ticker_up not in scans_by_ticker:
+            scans_by_ticker[ticker_up] = s
+            
+    # Sort scans by calculated score descending
+    scans = sorted(scans_by_ticker.values(), key=lambda s: s.score, reverse=True)
     
     ticker_symbols = [s.ticker for s in scans]
     univ_stmt = select(StockUniverse).where(StockUniverse.is_active == True)

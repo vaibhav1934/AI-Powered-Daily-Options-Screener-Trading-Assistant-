@@ -1,15 +1,15 @@
 """
-Continuous Universe Scanner Service
-===================================
+Continuous Universe Scanner Service (Free-Tier Rate-Limit Optimized)
+====================================================================
 Automated background scanning worker that runs the 50-factor framework
 across the active Stock Universe and Finnhub earnings calendar.
 
-Key Features:
+Free-Tier Optimization Specs:
 1. Strict $1B Market Cap Filter (market_cap >= $1,000,000,000 USD).
-2. Rate-Limiting & Quota Protection (Token bucket delay between API calls to stay well within 60 req/min).
-3. Zero Mock / Zero Fallback rule: All data points fetched dynamically from Finnhub & SEC EDGAR.
-4. Auto-persistence into PostgreSQL daily_scans and factor_logs tables.
-5. Lifespan background task with graceful shutdown support.
+2. Free-Tier Rate Limiting: 5 tickers per batch, 2.0s delay between calls (<= 30 req/min vs 60 limit).
+3. 60s cooldown between batches to maintain zero 429 quota pressure.
+4. 7-Day Rolling Window Persistence: Scans populate PostgreSQL daily_scans with multi-day deduplication.
+5. Zero Mock / Zero Fallback rule: 100% live data fetched dynamically from Finnhub & SEC EDGAR.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from app.services.scan_service import evaluate_and_persist_on_demand, MIN_MARKET
 
 logger = logging.getLogger("continuous_scanner")
 
-# Top tier liquid US tickers (> $1B market cap) prioritized for initial pre-scan
+# Priority liquid tickers (> $1B market cap) prioritized for initial pre-scan
 PRIORITY_TICKERS = [
     "NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "AMD", "PLTR",
     "JPM", "LLY", "V", "UNH", "XOM", "MA", "JNJ", "HD", "PG", "COST",
@@ -43,22 +43,22 @@ _scanner_running = False
 _scanner_stop_event = asyncio.Event()
 
 
-async def get_tickers_to_scan(session: AsyncSession, limit: int = 50) -> list[str]:
+async def get_tickers_to_scan(session: AsyncSession, limit: int = 5) -> list[str]:
     """
     Retrieve candidate tickers to scan:
-    1. Priority liquid tickers not scanned today.
-    2. Other active tickers from StockUniverse not yet scanned today.
+    1. Priority liquid tickers not scanned within the 7-day rolling window.
+    2. Other active tickers from StockUniverse not yet scanned in the last 7 days.
     """
-    today_dt = datetime.combine(date.today(), datetime.min.time(), tzinfo=timezone.utc)
+    rolling_7d_dt = datetime.now(timezone.utc) - timedelta(days=7)
     
-    # Get already scanned tickers today
-    stmt_scanned = select(DailyScan.ticker).where(DailyScan.scan_date >= today_dt)
+    # Get tickers scanned in the 7-day rolling window
+    stmt_scanned = select(DailyScan.ticker).where(DailyScan.scan_date >= rolling_7d_dt)
     scanned_res = await session.execute(stmt_scanned)
     scanned_tickers = {row[0].upper() for row in scanned_res.fetchall()}
     
     candidates: list[str] = []
     
-    # 1. Add priority tickers first if not scanned
+    # 1. Add priority tickers first if not scanned recently
     for ticker in PRIORITY_TICKERS:
         if ticker not in scanned_tickers and ticker not in candidates:
             candidates.append(ticker)
@@ -70,7 +70,7 @@ async def get_tickers_to_scan(session: AsyncSession, limit: int = 50) -> list[st
         select(StockUniverse.ticker)
         .where(StockUniverse.is_active == True)
         .order_by(StockUniverse.ticker)
-        .limit(limit * 3)
+        .limit(limit * 4)
     )
     univ_res = await session.execute(stmt_univ)
     univ_tickers = [row[0].upper() for row in univ_res.fetchall()]
@@ -84,21 +84,22 @@ async def get_tickers_to_scan(session: AsyncSession, limit: int = 50) -> list[st
     return candidates
 
 
-async def run_scanner_cycle(batch_size: int = 15, delay_between_calls_sec: float = 1.5) -> int:
+async def run_scanner_cycle(batch_size: int = 5, delay_between_calls_sec: float = 2.0) -> int:
     """
-    Executes one scanning cycle:
-    - Queries unscanned tickers from the universe.
-    - Evaluates 50-factor framework for each ticker with rate-limit delays.
+    Executes one free-tier compliant scanning cycle:
+    - 5 tickers per batch.
+    - 2.0s delay between calls (guarantees <= 30 calls/min against Finnhub's 60 req/min free limit).
+    - Evaluates 50-factor framework for each ticker.
     - Persists results to DB with $1B market cap enforcement.
     """
     async with async_session_factory() as session:
         tickers = await get_tickers_to_scan(session, limit=batch_size)
         
     if not tickers:
-        logger.info("[Continuous Scanner] All priority universe tickers scanned for today.")
+        logger.info("[Continuous Scanner] All priority universe tickers scanned within 7-day window.")
         return 0
         
-    logger.info("[Continuous Scanner] Starting scan cycle for %d tickers: %s", len(tickers), tickers)
+    logger.info("[Continuous Scanner] Starting free-tier scan batch for %d tickers: %s", len(tickers), tickers)
     scanned_count = 0
     
     for ticker in tickers:
@@ -112,53 +113,53 @@ async def run_scanner_cycle(batch_size: int = 15, delay_between_calls_sec: float
                 if scan_res:
                     scanned_count += 1
                     logger.info(
-                        "[Continuous Scanner] Successfully scanned %s: Score=%.1f | Risk=%s | List=%s",
+                        "[Continuous Scanner] Scanned %s: Score=%.1f | Risk=%s | List=%s",
                         ticker, scan_res.score, scan_res.risk_bucket, scan_res.list_type
                     )
         except Exception as e:
-            logger.warning("[Continuous Scanner] Failed to scan ticker %s: %s", ticker, str(e))
+            logger.warning("[Continuous Scanner] Error scanning ticker %s: %s", ticker, str(e))
             
-        # Rate limit delay between individual Finnhub calls (1.5s keeps requests <= 40/min)
+        # Free-tier rate limit delay (2.0s keeps request rate strictly at 30 req/min)
         try:
             await asyncio.sleep(delay_between_calls_sec)
         except asyncio.CancelledError:
             break
             
-    logger.info("[Continuous Scanner] Finished cycle. Scanned %d/%d tickers.", scanned_count, len(tickers))
+    logger.info("[Continuous Scanner] Finished batch. Scanned %d/%d tickers.", scanned_count, len(tickers))
     return scanned_count
 
 
 async def _continuous_scanner_loop() -> None:
     """
-    Background worker loop: runs scan cycles continuously with idle intervals.
+    Background worker loop: runs 5-ticker scan batches with 60-second cooldowns
+    to protect free-tier API quotas.
     """
     global _scanner_running
     _scanner_running = True
-    logger.info("[Continuous Scanner] Background universe scanner service started.")
+    logger.info("[Continuous Scanner] Background universe scanner daemon started (Free Tier Mode).")
     
-    # Initial startup delay to let app initialize and serve fast first requests
-    await asyncio.sleep(3.0)
+    # 5s startup delay before first scan
+    await asyncio.sleep(5.0)
     
     while not _scanner_stop_event.is_set():
         try:
-            scanned = await run_scanner_cycle(batch_size=10, delay_between_calls_sec=1.5)
-            # If no tickers needed scanning, sleep for a longer period (e.g. 5 minutes)
-            # Otherwise sleep 30 seconds before next batch to pace API rate limits smoothly
-            idle_seconds = 300.0 if scanned == 0 else 30.0
+            scanned = await run_scanner_cycle(batch_size=5, delay_between_calls_sec=2.0)
+            # Free tier pacing: 60s cooldown between 5-ticker batches, or 5m if all scanned
+            idle_seconds = 300.0 if scanned == 0 else 60.0
             
             try:
                 await asyncio.wait_for(_scanner_stop_event.wait(), timeout=idle_seconds)
             except asyncio.TimeoutError:
-                pass  # Timeout is normal — proceeds to next scan cycle
+                pass  # Cooldown finished, start next batch
         except asyncio.CancelledError:
             logger.info("[Continuous Scanner] Scanner loop cancelled.")
             break
         except Exception as e:
-            logger.error("[Continuous Scanner] Unexpected error in scanner loop: %s", str(e))
-            await asyncio.sleep(10.0)
+            logger.error("[Continuous Scanner] Error in scanner loop: %s", str(e))
+            await asyncio.sleep(15.0)
             
     _scanner_running = False
-    logger.info("[Continuous Scanner] Background universe scanner service stopped.")
+    logger.info("[Continuous Scanner] Background universe scanner daemon stopped.")
 
 
 def start_continuous_scanner() -> None:
@@ -167,7 +168,7 @@ def start_continuous_scanner() -> None:
     _scanner_stop_event.clear()
     if _scanner_task is None or _scanner_task.done():
         _scanner_task = asyncio.create_task(_continuous_scanner_loop())
-        logger.info("[Continuous Scanner] Spawned scanner task.")
+        logger.info("[Continuous Scanner] Spawned scanner task (Free Tier).")
 
 
 def stop_continuous_scanner() -> None:
