@@ -339,7 +339,7 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", gridColumn: "span 2" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Stochastic %K / %D</span>
                     <span style={{ fontWeight: 600, color: "#3c4043" }}>
-                      {osc.stochastic?.k ? `%K: ${osc.stochastic.k.toFixed(1)} | %D: ${osc.stochastic.d?.toFixed(1)}` : "Stochastic data active"}
+                      {osc.stochastic?.k != null ? `%K: ${Number(osc.stochastic.k).toFixed(1)} | %D: ${osc.stochastic.d != null ? Number(osc.stochastic.d).toFixed(1) : "N/A"}` : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -385,7 +385,7 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>20D Relative Volume</span>
                     <span style={{ fontWeight: 700, color: "#202124" }}>
-                      {vol.relative_volume ? `${vol.relative_volume.toFixed(2)}x` : "1.02x"}
+                      {vol.relative_volume != null ? `${Number(vol.relative_volume).toFixed(2)}x` : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -404,23 +404,23 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                     <span>Implied Volatility Regime</span>
                   </div>
                   <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#f3e8fd", color: "#8430ce", border: "1px solid #e1d2fc", fontWeight: 600 }}>
-                    {iv.regime || "Moderate Volatility"}
+                    {iv.regime || "Data Not Available"}
                   </span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Reference IV</span>
                     <span style={{ fontWeight: 700, color: "#202124" }}>
-                      {iv.iv_current != null ? (Number(iv.iv_current) > 1.0 ? `${Number(iv.iv_current).toFixed(1)}%` : `${(Number(iv.iv_current) * 100).toFixed(1)}%`) : "28.4%"}
+                      {iv.iv_current != null ? (Number(iv.iv_current) > 1.0 ? `${Number(iv.iv_current).toFixed(1)}%` : `${(Number(iv.iv_current) * 100).toFixed(1)}%`) : "N/A"}
                     </span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>IV Rank</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_rank ? `${iv.iv_rank}%` : "42.5%"}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_rank != null ? `${Number(iv.iv_rank).toFixed(1)}%` : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>IV Percentile</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_percentile ? `${iv.iv_percentile}%` : "48.0%"}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{iv.iv_percentile != null ? `${Number(iv.iv_percentile).toFixed(1)}%` : "N/A"}</span>
                   </div>
                 </div>
               </div>
@@ -438,13 +438,13 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>ATR (14D Span)</span>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
-                      ${((atr.atr_14 ?? (atr as any).atr) != null ? Number(atr.atr_14 ?? (atr as any).atr).toFixed(2) : (stock.price * 0.024).toFixed(2))}
+                      {(atr.atr_14 ?? (atr as any).atr) != null ? `$${Number(atr.atr_14 ?? (atr as any).atr).toFixed(2)}` : "N/A"}
                     </span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>ATR as % of Price</span>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>
-                      {atr.atr_pct != null ? (Number(atr.atr_pct) > 1.0 ? `${Number(atr.atr_pct).toFixed(2)}%` : `${(Number(atr.atr_pct) * 100).toFixed(2)}%`) : "2.40%"}
+                      {atr.atr_pct != null ? (Number(atr.atr_pct) > 1.0 ? `${Number(atr.atr_pct).toFixed(2)}%` : `${(Number(atr.atr_pct) * 100).toFixed(2)}%`) : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -462,19 +462,19 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Delta</span>
-                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.delta ?? 0.38}</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.delta != null ? Number(greeks.delta).toFixed(2) : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Gamma</span>
-                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.gamma ?? 0.04}</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.gamma != null ? Number(greeks.gamma).toFixed(4) : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Theta</span>
-                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.theta ?? -0.08}</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.theta != null ? Number(greeks.theta).toFixed(2) : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "8px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Vega</span>
-                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.vega ?? 0.15}</span>
+                    <span style={{ fontWeight: 700, color: "#1a73e8" }}>{greeks.vega != null ? Number(greeks.vega).toFixed(3) : "N/A"}</span>
                   </div>
                 </div>
                 <p style={{ fontSize: "10.5px", color: "#80868b", margin: "8px 0 0 0" }}>
@@ -490,18 +490,18 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                     <span>Options Flow & Open Interest (OI)</span>
                   </div>
                   <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#fef7e0", color: "#b06000", border: "1px solid #fce8b2", fontWeight: 600 }}>
-                    {oi.pcr_state || "Bullish Flow Skew"}
+                    {oi.pcr_state || "Data Not Available"}
                   </span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Put / Call Ratio</span>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>{oi.put_call_ratio != null ? Number(oi.put_call_ratio).toFixed(2) : "0.85"}</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: "#202124" }}>{oi.put_call_ratio != null ? Number(oi.put_call_ratio).toFixed(2) : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Call Open Interest</span>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: "#137333" }}>
-                      {(oi.total_call_oi ?? (oi as any).call_open_interest) != null ? Number(oi.total_call_oi ?? (oi as any).call_open_interest).toLocaleString() : "12.5K"}
+                      {(oi.total_call_oi ?? (oi as any).call_open_interest) != null ? Number(oi.total_call_oi ?? (oi as any).call_open_interest).toLocaleString() : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -584,15 +584,15 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Beta (vs. SPY)</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.beta != null ? Number(beta.beta).toFixed(2) : "1.12"}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.beta != null ? Number(beta.beta).toFixed(2) : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>S&P 500 Corr</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.sp500_correlation ? `${(beta.sp500_correlation * 100).toFixed(0)}%` : "76%"}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.sp500_correlation != null ? `${(Number(beta.sp500_correlation) * 100).toFixed(0)}%` : "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed", textAlign: "center" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Sector Corr</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.sector_correlation ? `${(beta.sector_correlation * 100).toFixed(0)}%` : "82%"}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{beta.sector_correlation != null ? `${(Number(beta.sector_correlation) * 100).toFixed(0)}%` : "N/A"}</span>
                   </div>
                 </div>
               </div>
@@ -605,17 +605,17 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                     <span>Sector Relative Strength</span>
                   </div>
                   <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", backgroundColor: "#e6f4ea", color: "#137333", border: "1px solid #ceead6", fontWeight: 600 }}>
-                    {sector.rank || "Leading Tier"}
+                    {sector.rank || "Data Not Available"}
                   </span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>Primary Sector</span>
-                    <span style={{ fontWeight: 700, color: "#202124" }}>{sector.sector || stock.sector}</span>
+                    <span style={{ fontWeight: 700, color: "#202124" }}>{sector.sector || stock.sector || "N/A"}</span>
                   </div>
                   <div style={{ backgroundColor: "#f8f9fa", padding: "10px", borderRadius: "8px", border: "1px solid #e8eaed" }}>
                     <span style={{ color: "#5f6368", display: "block", fontSize: "10.5px" }}>RS vs S&P 500</span>
-                    <span style={{ fontWeight: 700, color: "#137333" }}>{sector.relative_strength || "+2.4% vs Benchmark"}</span>
+                    <span style={{ fontWeight: 700, color: "#137333" }}>{sector.relative_strength || "N/A"}</span>
                   </div>
                 </div>
               </div>
@@ -647,7 +647,7 @@ export const TechnicalIndicatorHubModal: React.FC<TechnicalIndicatorHubModalProp
                     <span>Historical Volatility & Seasonality</span>
                   </div>
                   <p style={{ fontSize: "13px", color: "#202124", margin: "0 0 4px 0", fontWeight: 500 }}>
-                    30-Day Realized Volatility: {season.hist_vol_30d ? `${season.hist_vol_30d.toFixed(1)}%` : "24.6%"}
+                    30-Day Realized Volatility: {season.hist_vol_30d != null ? `${Number(season.hist_vol_30d).toFixed(1)}%` : "N/A"}
                   </p>
                   <span style={{ fontSize: "11px", color: "#5f6368" }}>
                     {season.seasonality_stats || "Quarterly distribution pattern"}
