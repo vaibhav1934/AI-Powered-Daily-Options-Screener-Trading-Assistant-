@@ -952,3 +952,96 @@ Evolve the app from a single hardcoded developer user path into a real multi-use
 - **Duplicate Columns Bug (Pandas):** Removed all reliance on `pandas.DataFrame.stack()` during upper-triangle correlation matrix extraction to fix fatal `ValueError: Columns with duplicate values are not supported in stack` crashes.
 - **Deduplication:** Added explicit `.upper()` deduplication in Step 2 Correlation De-clustering.
 - **Numpy Correlation Extraction:** Extract cross-holding covariance purely via `np.triu_indices_from(corr.values, k=1)` on the raw numeric numpy matrix.
+
+---
+
+## 17. Continuous Universe Scanner & Anti-Deadlock Architecture (2026-08-23)
+
+### Core Objective
+Continuously evaluate the entire US market universe with the 50-Factor Quantitative Framework without hitting external API rate limits (Finnhub 60 req/min free limit) or trapping the scanner on unscoreable/sub-$1B microcap stocks.
+
+### Architectural Workflow & Component Mechanics
+```mermaid
+graph TD
+    Daemon[Continuous Scanner Daemon<br>app.services.continuous_scanner] -->|Batch of 5 Tickers| Pipeline[Scan Pipeline Engine]
+    Pipeline --> QueueCheck{Check Priority Queue<br>100+ Mega/Large Caps}
+    QueueCheck -->|Unscanned Exists| RunBatch[Evaluate 50-Factor Framework<br>1.5s Token Bucket Delay]
+    QueueCheck -->|Priority Done| SweepUniverse[Sweep StockUniverse Table<br>Advancing Cursor Offset]
+    RunBatch --> CapCheck{Market Cap >= $1B?}
+    CapCheck -->|No / Delisted| SkipMark[Record in _attempted_tickers<br>Skip DB Insert & Advance Cursor]
+    CapCheck -->|Yes| Persist[Write to PostgreSQL daily_scans<br>+ 50 FactorLog Rows]
+    SkipMark & Persist --> Rest[Short 5s Rest / 60s Rest<br>Start Next Batch]
+```
+
+### Key Technical Defenses:
+1. **Anti-Deadlock Attempted Skip Cache (`_attempted_tickers`)**:
+   - Stores all attempted tickers in an in-memory set during runtime.
+   - When a stock fails the **$1B Market Cap Filter** (`market_cap_usd < 1_000_000_000.0`), it is marked as attempted and skipped immediately without writing to `DailyScan`.
+   - Prevents the alphabetical queue from getting trapped on the same sub-$1B SPACs/penny stocks (`AAC`, `AACB`, `AACBU`) in an infinite retry loop.
+2. **100+ Liquid Large-Cap Priority Pipeline (`PRIORITY_TICKERS`)**:
+   - Initial pre-scan prioritizes high-volume, liquid market leaders (`NVDA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, `TSLA`, `AVGO`, `AMD`, `PLTR`, `JPM`, `LLY`, `V`, `UNH`, `XOM`, `MA`, `JNJ`, `HD`, `PG`, `COST`, etc.).
+   - Guarantees immediate rich data availability for all major market tickers upon application startup.
+3. **Free-Tier Rate-Limiting Protocol**:
+   - Batch size: 5 tickers per cycle.
+   - Inter-request delay: `1.5s` per API call ($\le 40$ calls/min, well under the 60 calls/min free quota).
+   - Cooldown: 5.0s between active batches, 60.0s when all candidates are fresh in the 7-day rolling window.
+4. **Database Startup Resiliency & PostgreSQL Dialect Guard**:
+   - In `app/main.py` lifespan startup, schema migration blocks check `if engine.dialect.name == "postgresql":` before executing procedural SQL (`DO $$ ... $$`).
+   - Prevents fatal `OperationalError: near "DO": syntax error` crashes on SQLite or alternate pooler configurations.
+
+---
+
+## 18. 14-Factor Technical Indicator Hub & UI Architecture (2026-08-23)
+
+### Overview & Visual Design Tokens
+- **Design System**: Institutional Clean Light Theme (`#ffffff` background, `#f8f9fa` card containers, `#e8eaed` border contours, `#202124` high-contrast typography, `#1a73e8` institutional blue accents).
+- **Navigation Structure**: 4 organized category tabs:
+  1. *Trend & Oscillators* (Moving Averages, RSI, MACD, S/R)
+  2. *Volume & Volatility* (Volume Profile, IV Regime, ATR, 52W/6M Ranges)
+  3. *Options & Structure* (Greek Sensitivity, Options Flow / OI, Beta & Correlation, Sector RS)
+  4. *Catalysts & Events* (Earnings Consensus Band, Sourced Catalyst Feed)
+
+### 14 Quantitative Factors Mapping Table:
+| Factor # | Indicator Name | Computation / Source | Presentation Format |
+|---|---|---|---|
+| **1** | Moving Averages Alignment | SMA 20, 50, 200 & EMA 9, 21 from daily close bars | Price vs SMA 200 state, Golden/Death Cross flags |
+| **2** | Momentum Oscillators | 14D Wilder RSI, MACD (12, 26, 9), Stochastic %K/%D | RSI State (Overbought/Oversold/Neutral), MACD Histogram (`+`/`-`), Line & Signal |
+| **3** | Reference Levels | Statistical Support / Resistance derived bands | Support Band (`$xx.xx`), Resistance Band (`$yy.yy`) |
+| **4** | Volume & Liquidity Profile | Intraday volume, 20D average volume, relative volume ratio | Daily Volume, Relative Volume ratio, Volume Profile state |
+| **5** | Implied Volatility Regime | Option chain implied volatility, IV Rank %, IV Percentile % | Current IV %, IV Rank %, Regime classification |
+| **6** | Average True Range (ATR) | 14D Wilder ATR calculated from daily candle High/Low/Close | Dollar ATR (`$x.xx`), ATR as % of current price |
+| **7** | Options Greeks Sensitivity | Black-Scholes Delta, Gamma, Theta, Vega for 30-45 DTE | Greek sensitivities profile for reference contracts |
+| **8** | Options Flow & Open Interest | Put/Call Ratio, total call OI, total put OI | PCR ratio, skew status, strike clustering |
+| **9** | 52-Week Range Extremes | Rolling 252-bar high and low price bounds | 52W High, 52W Low, % distance to ATH/ATL |
+| **10** | 6-Month / 26-Week Range Extremes | Rolling 126-bar high and low price bounds | 6M High, 6M Low, mid-range alignment |
+| **11** | Beta & Benchmark Correlation | 60-day covariance vs SPY index ETF | Beta coefficient, S&P 500 correlation %, Sector correlation % |
+| **12** | Sector Relative Strength | Performance relative to SPY and sector SPDR ETF | Primary sector name, relative strength score |
+| **13** | Earnings Consensus Band | Finnhub earnings calendar & analyst estimates | Wall Street consensus range, report date proximity |
+| **14** | Sourced Catalysts & News Digest | Finnhub news API + Sentiment Analyzer + Swipe Digest | Swipeable vertical digest + list view, $\le 60$-word summaries, live source URLs |
+
+---
+
+## 19. Investment Advisers Act Publisher Exemption Compliance Matrix
+
+To ensure absolute regulatory compliance under the **Investment Advisers Act Publisher Exemption (SEC v. Lowe, 472 U.S. 181)**, all features, endpoints, and UI copy are engineered under a strict non-personalized, non-advisory publishing standard:
+
+```
++------------------------------------+------------------------------------+
+|  PROHIBITED (Advisory Exposure)    |  IMPLEMENTED (Publisher Exemption) |
++------------------------------------+------------------------------------+
+| "Execution Parameters"             | "Reference Technical Levels"       |
+| "Stop Loss: $384.58"               | "Observed Support Reference"       |
+| "Target Strike: $400 Call"         | "Statistical Boundary Profiler"    |
+| "AI Confirmed" Badge               | REMOVED (Pure quantitative data)   |
+| Star ratings ("★ 7.9")             | "Signal: 7.9 / 10 • Model Score"   |
+| "Portfolio Health: REBALANCE"      | "Risk Dispersion Profile: 53.2"    |
+| "Optimizer Actions (Buy/Sell)"     | "Educational Factor Insights"      |
+| "Zero-Mock Data" (Factual risk)    | "Live Market Feed (Finnhub / SEC)" |
+| Unhedged AI chat responses         | Mandated compliance footnote       |
++------------------------------------+------------------------------------+
+```
+
+### Global Educational Disclaimer Contract:
+Applied persistently across application footers, modal headers, and AI chat endpoints:
+> *"StockGlass AI is published exclusively for educational, market research, and informational analysis. It does not provide personalized investment, legal, tax, or financial advice. All observed reference levels, factor scores, and technical indicators are generated through automated quantitative models and do not constitute recommendations or solicitations to buy or sell any security."*
+
