@@ -1134,9 +1134,9 @@ def _map_dual_list_type(dual_horizon: dict[str, Any]) -> Optional[ListType]:
 async def evaluate_and_persist_on_demand(
     session: AsyncSession,
     symbol: str,
-    quote: Any,
-    name: str,
-    sector: str,
+    quote: Any = None,
+    name: str = "",
+    sector: str = "",
 ) -> Optional[DailyScan]:
     """
     Run on-demand 50-factor evaluation for a single ticker that was missed by morning batch scan.
@@ -1154,7 +1154,13 @@ async def evaluate_and_persist_on_demand(
 
         profile_client = FinnhubClient()
         try:
+            if quote is None:
+                quote = await profile_client.get_quote(symbol, session=session)
             profile = await profile_client.get_company_profile(symbol, session=session)
+            if not name:
+                name = profile.get("name") or symbol
+            if not sector or sector in ("Unknown", "US Equities"):
+                sector = profile.get("sector") or sector or "US Equities"
             earnings_entries = await profile_client.get_earnings_for_symbol_window(
                 symbol,
                 start_date=date.today(),
