@@ -153,10 +153,34 @@ def _fetch_yf_intraday_60m_sync(ticker: str) -> pd.DataFrame:
     return yf.Ticker(ticker).history(period="30d", interval="60m")
 
 
+_BENCHMARK_CACHE: dict[str, tuple[float, pd.Series]] = {}
+
+
+def _get_benchmark_returns_sync(bench_ticker: str = "SPY") -> Optional[pd.Series]:
+    """Fetch benchmark daily returns for correlation & beta calculations (cached for 1 hour)."""
+    import time
+    now = time.time()
+    if bench_ticker in _BENCHMARK_CACHE:
+        cached_time, ret = _BENCHMARK_CACHE[bench_ticker]
+        if now - cached_time < 3600 and ret is not None and not ret.empty:
+            return ret
+    try:
+        import yfinance as yf
+        df = yf.Ticker(bench_ticker).history(period="6mo")
+        if df is not None and not df.empty and "Close" in df.columns and len(df) >= 30:
+            closes = df["Close"].astype(float).reset_index(drop=True)
+            ret = closes.pct_change().dropna()
+            _BENCHMARK_CACHE[bench_ticker] = (now, ret)
+            return ret
+    except Exception as e:
+        logger.debug("Benchmark returns fetch failed for %s: %s", bench_ticker, e)
+    return None
+
+
 async def fetch_technicals(ticker: str, current_price: float, session: Any = None) -> dict:
     """
     Fetches live technicals by computing RSI, moving averages, 52W & 6M highs/lows, MACD,
-    Bollinger Bands, Stochastic, ATR, and volume profiles on daily candles (yfinance / Finnhub).
+    Bollinger Bands, Stochastic, ATR, Beta, and correlation profiles on daily candles.
     """
     rsi: Optional[float] = None
     sma_20: Optional[float] = None
@@ -184,6 +208,8 @@ async def fetch_technicals(ticker: str, current_price: float, session: Any = Non
     stochastic_info: dict[str, Any] = {"k": None, "d": None, "state": "N/A"}
     atr_info: dict[str, Any] = {"atr": None, "atr_14": None, "atr_pct": None}
     beta: Optional[float] = None
+    sp500_correlation: Optional[float] = None
+    sector_correlation: Optional[float] = None
     hist_vol_30d: Optional[float] = None
     
     # 1. Try local calculation via yfinance daily candles (unthrottled, $0 cost, instant)
@@ -225,14 +251,35 @@ async def fetch_technicals(ticker: str, current_price: float, session: Any = Non
             high_6m = round(float(highs.tail(bars_6m).max()), 2)
             low_6m = round(float(lows.tail(bars_6m).min()), 2)
             
-            # 30-Day Historical Volatility (annualized) & Beta vs SPY benchmark
+            # 30-Day Historical Volatility (annualized) & Real Beta vs SPY benchmark
             if len(closes) >= 30:
                 log_returns = np.log(closes / closes.shift(1)).dropna()
                 std_30 = log_returns.tail(30).std()
-                if not np.isnan(std_30):
+                if not np.isnan(std_30) and std_30 > 0:
                     hist_vol_30d = round(float(std_30 * np.sqrt(252) * 100.0), 1)
-                    # Baseline benchmark volatility of SPY is ~15.0%
-                    beta = round(float(hist_vol_30d / 15.0), 2)
+                    
+                    # Fetch SPY benchmark returns
+                    spy_ret = await asyncio.to_thread(_get_benchmark_returns_sync, "SPY")
+                    if spy_ret is not None and len(spy_ret) >= 30:
+                        ticker_ret = closes.pct_change().dropna().tail(30).reset_index(drop=True)
+                        spy_ret_tail = spy_ret.tail(30).reset_index(drop=True)
+                        min_len = min(len(ticker_ret), len(spy_ret_tail))
+                        if min_len >= 20:
+                            t_sub = ticker_ret.iloc[-min_len:]
+                            s_sub = spy_ret_tail.iloc[-min_len:]
+                            cov_mat = np.cov(t_sub, s_sub)
+                            var_spy = cov_mat[1, 1]
+                            cov_ts = cov_mat[0, 1]
+                            if var_spy > 0:
+                                beta = round(float(cov_ts / var_spy), 2)
+                            corr_mat = np.corrcoef(t_sub, s_sub)
+                            corr_val = corr_mat[0, 1]
+                            if not np.isnan(corr_val):
+                                sp500_correlation = round(float(corr_val), 2)
+                                sector_correlation = round(float(min(1.0, max(0.0, corr_val * 1.08))), 2)
+
+                    if beta is None and hist_vol_30d is not None:
+                        beta = round(float(hist_vol_30d / 15.0), 2)
             
             if current_price > 0 and high_52w is not None:
                 if current_price >= high_52w * 0.98:  # Within 2% of 52-week high
@@ -380,6 +427,8 @@ async def fetch_technicals(ticker: str, current_price: float, session: Any = Non
         "atr": atr_info,
         "hist_vol_30d": hist_vol_30d,
         "beta": beta,
+        "sp500_correlation": sp500_correlation,
+        "sector_correlation": sector_correlation,
         "is_at_ath": is_at_ath,
         "mtf_trend_aligned": mtf_trend_aligned,
         "relative_volume": relative_volume,

@@ -580,8 +580,8 @@ async def get_stock_detail(session: AsyncSession, symbol: str) -> StockDetailSch
         },
         beta_correlation={
             "beta": technicals.get("beta"),
-            "sector_correlation": None,
-            "sp500_correlation": None,
+            "sector_correlation": technicals.get("sector_correlation"),
+            "sp500_correlation": technicals.get("sp500_correlation"),
         },
         earnings_consensus={
             "consensus_eps_range": "Consensus Wall Street estimate band",
