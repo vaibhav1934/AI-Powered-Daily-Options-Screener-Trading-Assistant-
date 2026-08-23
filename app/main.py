@@ -89,34 +89,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-            # Guard against migration drift: ensure positions.user_id exists before
-            # any portfolio query path that filters by user ownership.
-            await conn.execute(text("""
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = 'positions'
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'user_id'
-                ) THEN
-                    ALTER TABLE public.positions ADD COLUMN user_id integer NULL;
-                END IF;
+            # Guard against migration drift only if connected to PostgreSQL
+            if engine.dialect.name == "postgresql":
+                await conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_name = 'positions'
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'user_id'
+                    ) THEN
+                        ALTER TABLE public.positions ADD COLUMN user_id integer NULL;
+                    END IF;
 
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'user_id'
-                ) THEN
-                    CREATE INDEX IF NOT EXISTS ix_positions_user_id ON public.positions (user_id);
-                END IF;
-            END
-            $$;
-            """))
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'positions' AND column_name = 'user_id'
+                    ) THEN
+                        CREATE INDEX IF NOT EXISTS ix_positions_user_id ON public.positions (user_id);
+                    END IF;
+                END
+                $$;
+                """))
         logger.info("Database schema initialized successfully")
     except Exception as e:
-        logger.error("Failed to initialize database schema: %s", str(e))
+        logger.warning("Database schema initialization warning (non-fatal): %s", str(e))
 
     async def _run_portfolio_maintenance(cadence: str) -> None:
         """Run scheduled portfolio scoring/optimization for all active users."""
