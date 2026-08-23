@@ -126,6 +126,11 @@ To target and maintain full compliance with the **Investment Advisers Act Publis
    - Touch gesture support (swipe up/down), desktop drag & arrow-key navigation (`↑`/`↓`), progress track indicators, sentiment tone badges (`Positive Catalyst` / `Negative Tone` / `Market Commentary`), concise synthesized $\le 60$-word summaries, and live source attribution with direct outbound links.
    - Dual-mode view integration across both the right-hand Stock Detail Panel and the 14-Factor Indicator Hub (Factor 14: Sourced Catalysts).
 
+6. **Continuous Universe Scanner & $1B Market Cap Filter:**
+   - **$1B Market Cap Rule**: All candidate stocks must satisfy `market_cap >= $1,000,000,000` (1 billion USD) before entering the 50-factor pipeline. Sub-$1B tickers are filtered out prior to scoring.
+   - **Continuous Background Scanner Daemon (`app.services.continuous_scanner`)**: Automated background worker running across application lifespan. Progressively scans active liquid US tickers with token bucket delays (1.5s per request) to respect external API quotas (<=40 req/min vs Finnhub 60 limit).
+   - **Default Screener Layout**: Landing page defaults to 10 stocks per page (`pageSize = 10`), strictly ranked by calculated 50-factor quantitative score descending (`score desc`), with on-demand fallback computation on ticker selection.
+
 ### High-Level System Architecture
 
 ```mermaid

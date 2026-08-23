@@ -204,11 +204,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             weekly_minute=settings.app.portfolio_weekly_optimize_minute,
         )
 
+    # Start continuous background scanner daemon for universe factor scanning
+    try:
+        from app.services.continuous_scanner import start_continuous_scanner, stop_continuous_scanner
+        start_continuous_scanner()
+        logger.info("Continuous Universe Scanner started successfully")
+    except Exception as exc:
+        logger.error("Failed to start continuous universe scanner: %s", str(exc))
+
     logger.info("Application ready")
 
     yield
 
     # Shutdown
+    try:
+        from app.services.continuous_scanner import stop_continuous_scanner
+        stop_continuous_scanner()
+        logger.info("Continuous Universe Scanner stopped")
+    except Exception:
+        pass
+
     if scheduler is not None:
         scheduler.shutdown(wait=False)
         logger.info("Portfolio scheduler stopped")

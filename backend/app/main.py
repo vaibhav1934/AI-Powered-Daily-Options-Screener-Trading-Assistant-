@@ -13,7 +13,6 @@ import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-import asyncio
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -25,8 +24,7 @@ from sqlalchemy import select, text
 from app.api.router import api_router, root_api_router
 from app.core.config import get_settings
 from app.core.exceptions import AppError
-from app.core.rate_limiter import init_rate_limiters, rate_limiter_registry
-from app.services.scan_service import trigger_scan
+from app.core.rate_limiter import init_rate_limiters
 from app.db.models import User
 from app.db.session import engine
 from app.db.models import Base
@@ -120,45 +118,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error("Failed to initialize database schema: %s", str(e))
 
-    async def _run_continuous_scanner() -> None:
-        """Run scanning continuously while respecting API rate limits."""
-        logger.info(
-            "Continuous scanner started",
-            batch_size=settings.app.scan_batch_size,
-            interval=settings.app.scan_interval_seconds,
-        )
-        while True:
-            try:
-                async with async_session_factory() as session:
-                    res = await trigger_scan(session, batch_size=settings.app.scan_batch_size)
-                    
-                status = res.get("status")
-                tickers_scanned = res.get("tickers_scanned", 0)
-                
-                logger.info(f"Continuous scanner batch completed. Status: {status}, Scanned: {tickers_scanned}")
-                
-                if status == "ALL_SCANNED":
-                    # Rest for a while once the daily universe is fully scanned
-                    await asyncio.sleep(3600)
-                    continue
-                    
-                if status == "SCAN_ALREADY_RUNNING":
-                    await asyncio.sleep(30)
-                    continue
-
-                # Check rate limits to compute dynamic backoff
-                limit_status = rate_limiter_registry.status()
-                finnhub_status = limit_status.get("finnhub", {})
-                retry_after = finnhub_status.get("retry_after_seconds", 0)
-                
-                # Sleep enough to guarantee we stay within limits, plus interval buffer
-                sleep_time = max(settings.app.scan_interval_seconds, retry_after)
-                await asyncio.sleep(sleep_time)
-
-            except Exception as e:
-                logger.error("Continuous scanner encountered an error", error=str(e))
-                await asyncio.sleep(settings.app.scan_interval_seconds)
-
     async def _run_portfolio_maintenance(cadence: str) -> None:
         """Run scheduled portfolio scoring/optimization for all active users."""
         try:
@@ -245,17 +204,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             weekly_minute=settings.app.portfolio_weekly_optimize_minute,
         )
 
-    logger.info("Application ready")
+    # Start continuous background scanner daemon for universe factor scanning
+    try:
+        from app.services.continuous_scanner import start_continuous_scanner, stop_continuous_scanner
+        start_continuous_scanner()
+        logger.info("Continuous Universe Scanner started successfully")
+    except Exception as exc:
+        logger.error("Failed to start continuous universe scanner: %s", str(exc))
 
-    continuous_scanner_task = None
-    if settings.app.scan_continuous_enabled:
-        continuous_scanner_task = asyncio.create_task(_run_continuous_scanner())
+    logger.info("Application ready")
 
     yield
 
     # Shutdown
-    if continuous_scanner_task:
-        continuous_scanner_task.cancel()
+    try:
+        from app.services.continuous_scanner import stop_continuous_scanner
+        stop_continuous_scanner()
+        logger.info("Continuous Universe Scanner stopped")
+    except Exception:
+        pass
+
     if scheduler is not None:
         scheduler.shutdown(wait=False)
         logger.info("Portfolio scheduler stopped")
