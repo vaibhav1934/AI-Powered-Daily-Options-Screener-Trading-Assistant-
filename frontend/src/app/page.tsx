@@ -12,6 +12,7 @@ import { ScreenerTable } from "@/components/screener/ScreenerTable";
 import { DetailPanel } from "@/components/screener/DetailPanel";
 import { FactorModal } from "@/components/screener/FactorModal";
 import { AIChatPanel } from "@/components/chat/AIChatPanel";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import AuthOverlay from "@/components/auth/AuthOverlay";
 import { isAuthenticated } from "@/lib/auth";
 
@@ -625,7 +626,7 @@ export default function StockGlassProDashboard() {
       )}
 
       {/* Persistent Compliance & Publisher Exemption Footer Banner */}
-      <footer style={{ borderTop: "1px solid #e8eaed", background: "#f8f9fa", padding: "6px 20px", fontSize: 11, color: "#5f6368", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+      <footer style={{ borderTop: "1px solid #e8eaed", background: "#f8f9fa", padding: isMobile ? "8px 16px 68px" : "6px 20px", fontSize: 11, color: "#5f6368", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <span>
           <strong>Disclaimer:</strong> For educational, market research, and informational purposes only. Not investment, tax, or legal advice. No personalized recommendations.
         </span>
@@ -633,6 +634,9 @@ export default function StockGlassProDashboard() {
           Live Market Feeds: Polygon.io • SEC EDGAR • Finnhub
         </span>
       </footer>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav isMobile={isMobile} />
 
       {/* Full 50-Factor Log Modal */}
       {showFactors && (

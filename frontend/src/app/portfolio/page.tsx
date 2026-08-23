@@ -6,6 +6,7 @@ import { PortfolioPositionsTable } from "@/components/portfolio/PortfolioPositio
 import { fetchPaperPositions, fetchPortfolioOptimization, fetchPortfolioScore } from "@/lib/stockglass_api";
 import { isAuthenticated } from "@/lib/auth";
 import AuthOverlay from "@/components/auth/AuthOverlay";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { PortfolioOptimizationResponse, PortfolioScoreResponse, PositionItem } from "@/types/stockglass";
 import { Activity, ArrowRightLeft, CircleAlert, ShieldCheck } from "lucide-react";
 
@@ -323,7 +324,7 @@ export default function PortfolioPage() {
       )}
 
       {/* Persistent Compliance & Publisher Exemption Footer Banner */}
-      <footer style={{ borderTop: "1px solid #e8eaed", background: "#f8f9fa", padding: "10px 20px", fontSize: 11, color: "#5f6368", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
+      <footer style={{ borderTop: "1px solid #e8eaed", background: "#f8f9fa", padding: isMobileLayout ? "10px 16px 68px" : "10px 20px", fontSize: 11, color: "#5f6368", display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
         <span>
           <strong>Disclaimer:</strong> For educational, market research, and informational purposes only. Not investment, tax, or legal advice. No personalized recommendations.
         </span>
@@ -331,6 +332,9 @@ export default function PortfolioPage() {
           Live Market Feeds: Polygon.io • SEC EDGAR • Finnhub
         </span>
       </footer>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav isMobile={isMobileLayout} />
     </div>
   );
 }

@@ -158,50 +158,75 @@ export function Navbar({
           }}
         >
           {/* Logo & Brand */}
-          <div style={{ fontSize: isMobile ? 17 : 22, fontWeight: 400, color: "#5f6368", letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-            <span><span style={{ color: "#1a73e8", fontWeight: 500 }}>Stock</span>Glass AI</span>
-            <span style={{ fontSize: 9, background: "#e8f0fe", color: "#1a73e8", padding: "1px 5px", borderRadius: 8, fontWeight: 700, marginLeft: 4 }}>PRO</span>
-          </div>
+          <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+            {isMobile ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #1a73e8 0%, #174ea6 100%)",
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    padding: "3px 7px",
+                    borderRadius: 8,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  SG
+                </div>
+                <span style={{ fontSize: 9, background: "#e8f0fe", color: "#1a73e8", padding: "2px 5px", borderRadius: 6, fontWeight: 700 }}>
+                  PRO
+                </span>
+              </div>
+            ) : (
+              <div style={{ fontSize: 22, fontWeight: 400, color: "#5f6368", letterSpacing: -0.5, display: "flex", alignItems: "center", gap: 4 }}>
+                <span><span style={{ color: "#1a73e8", fontWeight: 500 }}>Stock</span>Glass AI</span>
+                <span style={{ fontSize: 10, background: "#e8f0fe", color: "#1a73e8", padding: "2px 6px", borderRadius: 10, fontWeight: 600, marginLeft: 6 }}>PRO</span>
+              </div>
+            )}
+          </Link>
 
-          {/* Navigation Links */}
-          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 4 : 8, minWidth: isMobile ? 0 : 200, flexShrink: 0 }}>
-            <Link
-              href="/"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: isMobile ? 3 : 6,
-                padding: isMobile ? "5px 8px" : "6px 12px",
-                borderRadius: 999,
-                background: pathname === "/" ? "#e8f0fe" : "transparent",
-                color: pathname === "/" ? "#1a73e8" : "#5f6368",
-                fontSize: isMobile ? 12 : 13,
-                fontWeight: 700,
-                textDecoration: "none",
-                border: pathname === "/" ? "1px solid #d2e3fc" : "1px solid transparent",
-              }}
-            >
-              <BarChart2 size={13} /> {isMobile ? "Scan" : "Screener"}
-            </Link>
-            <Link
-              href="/portfolio"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: isMobile ? 3 : 6,
-                padding: isMobile ? "5px 8px" : "6px 12px",
-                borderRadius: 999,
-                background: pathname === "/portfolio" ? "#e8f0fe" : "transparent",
-                color: pathname === "/portfolio" ? "#1a73e8" : "#5f6368",
-                fontSize: isMobile ? 12 : 13,
-                fontWeight: 700,
-                textDecoration: "none",
-                border: pathname === "/portfolio" ? "1px solid #d2e3fc" : "1px solid transparent",
-              }}
-            >
-              <BriefcaseBusiness size={13} /> {isMobile ? "Book" : "Portfolio"}
-            </Link>
-          </div>
+          {/* Navigation Links (Desktop Only - Mobile uses Bottom Nav) */}
+          {!isMobile && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 200, flexShrink: 0 }}>
+              <Link
+                href="/"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: pathname === "/" ? "#e8f0fe" : "transparent",
+                  color: pathname === "/" ? "#1a73e8" : "#5f6368",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  border: pathname === "/" ? "1px solid #d2e3fc" : "1px solid transparent",
+                }}
+              >
+                <BarChart2 size={14} /> Screener
+              </Link>
+              <Link
+                href="/portfolio"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: pathname === "/portfolio" ? "#e8f0fe" : "transparent",
+                  color: pathname === "/portfolio" ? "#1a73e8" : "#5f6368",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  border: pathname === "/portfolio" ? "1px solid #d2e3fc" : "1px solid transparent",
+                }}
+              >
+                <BriefcaseBusiness size={14} /> Portfolio
+              </Link>
+            </div>
+          )}
 
           {/* Desktop Embedded Search Bar */}
           {!isMobile && showSearch && (
